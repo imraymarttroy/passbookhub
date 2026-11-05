@@ -184,10 +184,11 @@
   async function busy(form, label, action) {
     const button = form.querySelector('[type="submit"]');
     if (button.disabled) return;
+    const iconOnly = button.classList.contains('icon-submit');
     const original = button.textContent;
     clearErrors(form);
     button.disabled = true;
-    button.textContent = label;
+    if (iconOnly) button.setAttribute('aria-busy', 'true'); else button.textContent = label;
     try {
       await action();
     } catch (error) {
@@ -203,7 +204,7 @@
     } finally {
       if (button.isConnected) {
         button.disabled = false;
-        button.textContent = original;
+        if (iconOnly) button.removeAttribute('aria-busy'); else button.textContent = original;
       }
     }
   }
@@ -2130,6 +2131,13 @@
       }
     }, navIcon('signout'), h('span', { class: 'nav-label' }, 'Sign out'));
   }
+  function signOutIcon() {
+    const b = signOutButton();
+    b.classList.add('icon-only');
+    b.title = 'Sign out';
+    b.setAttribute('aria-label', 'Sign out');
+    return b;
+  }
 
   function messagesBadge() {
     const badge = h('span', { class: 'nav-badge', hidden: true, 'data-kind': 'messages' });
@@ -2190,7 +2198,7 @@
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
           h('li', { class: 'nav-signout-li' }, signOutButton()))),
-      h('div', { class: 'sidebar-foot' }, onlineBadge(), signOutButton(), versionButton(' side-version')));
+      h('div', { class: 'sidebar-foot' }, onlineBadge(), signOutIcon(), versionButton(' side-version')));
     drawBadges();
     const shellEl = h('div', { class: 'app-shell' },
       h('div', { class: 'bg-orbs', 'aria-hidden': 'true' }, h('span'), h('span')),
@@ -2223,6 +2231,47 @@
     const holder = document.createElement('span');
     holder.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + VIS_ICONS[visibility] + '</svg>';
     return holder.firstChild;
+  }
+
+  /* Who can see a new post: three icon buttons, one click each (no dropdown). Reads like a select: .value */
+  function visibilityIcons(value, onChange) {
+    const group = h('div', { class: 'vis-icons', role: 'radiogroup', 'aria-label': 'Who can see this' });
+    let current = SOC.VISIBILITY[value] ? value : 'public';
+    const buttons = Object.keys(SOC.VISIBILITY).map(function (key) {
+      const b = h('button', {
+        type: 'button', class: 'vis-icon', role: 'radio', 'data-vis': key,
+        title: SOC.VISIBILITY[key].label + ': ' + SOC.VISIBILITY[key].hint, 'aria-label': SOC.VISIBILITY[key].label,
+        onclick: function () { set(key); if (onChange) onChange(key); }
+      }, visIcon(key));
+      return b;
+    });
+    function set(key) {
+      current = key;
+      buttons.forEach(function (b) { const on = b.getAttribute('data-vis') === key; b.setAttribute('aria-checked', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+    }
+    group.addEventListener('keydown', function (e) {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].indexOf(e.key) === -1) return;
+      e.preventDefault();
+      const keys = Object.keys(SOC.VISIBILITY);
+      const i = (keys.indexOf(current) + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1) + keys.length) % keys.length;
+      set(keys[i]); if (onChange) onChange(keys[i]); buttons[i].focus();
+    });
+    group.append.apply(group, buttons);
+    set(current);
+    Object.defineProperty(group, 'value', { get: function () { return current; } });
+    return group;
+  }
+  const SEND_SVG = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg>';
+  function postButton() {
+    const b = h('button', { class: 'post-send icon-submit', type: 'submit', 'aria-label': 'Post', title: 'Post (Enter)' });
+    b.innerHTML = SEND_SVG;
+    return b;
+  }
+  /* Enter posts; Shift+Enter makes a new line. */
+  function enterToSubmit(text, form) {
+    text.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); form.requestSubmit(); }
+    });
   }
 
   function visibilitySelect(id, value, label) {
@@ -2458,8 +2507,7 @@
   function composer(user, onPosted) {
     const counter = h('span', { class: 'small muted num' });
     const text = h('textarea', { id: 'f-post', name: 'post', rows: 3, maxlength: SOC.POST_MAX, placeholder: 'What is on your mind, ' + user.name.split(' ')[0] + '?' });
-    const select = visibilitySelect('f-visibility', state.postVisibility || 'circle');
-    select.addEventListener('change', function () { state.postVisibility = select.value; });
+    const select = visibilityIcons(state.postVisibility || 'circle', function (v) { state.postVisibility = v; });
     function count() { counter.textContent = text.value.length + ' / ' + SOC.POST_MAX; }
     text.addEventListener('input', count);
     count();
@@ -2482,9 +2530,10 @@
       h('div', { class: 'composer-top' }, avatar(user, user.avatar, 2.5), h('label', { class: 'vh', for: 'f-post' }, 'Write a post'), text),
       formError(),
       h('div', { class: 'composer-bar' },
-        h('label', { class: 'vis-picker' }, h('span', { class: 'small muted' }, 'Who can see this'), select),
+        select,
         counter,
-        h('button', { class: 'btn primary', type: 'submit' }, 'Post')));
+        postButton()));
+    enterToSubmit(text, form);
     return form;
   }
 
@@ -2876,10 +2925,9 @@
   function threadComposer(user, onPosted) {
     const text = h('textarea', { id: 'f-post', name: 'post', rows: 1, maxlength: SOC.POST_MAX, placeholder: 'What’s new?', 'aria-label': 'Start a post' });
     const counter = h('span', { class: 'th-counter num', 'aria-live': 'polite' });
-    const select = visibilitySelect('f-visibility', state.postVisibility || 'public', 'Who can see this');
-    select.classList.add('th-vis-select');
-    select.addEventListener('change', function () { state.postVisibility = select.value; });
-    const send = h('button', { class: 'btn primary small', type: 'submit', disabled: true }, 'Post');
+    const select = visibilityIcons(state.postVisibility || 'public', function (v) { state.postVisibility = v; });
+    const send = postButton();
+    send.disabled = true;
     function sync() {
       text.style.height = 'auto';
       text.style.height = Math.min(text.scrollHeight, 320) + 'px';
@@ -2911,6 +2959,7 @@
         text,
         formError(),
         h('div', { class: 'th-compose-bar' }, select, counter, send)));
+    enterToSubmit(text, form);
     setTimeout(sync, 0);
     return form;
   }
