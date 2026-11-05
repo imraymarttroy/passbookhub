@@ -1749,28 +1749,6 @@
     SOC.startPresence();
   }
 
-  /** "Ana's dashboard" links for the dashboards shared with you. */
-  function sharedNav(view) {
-    const holder = h('li', { class: 'shared-nav' });
-    function draw() {
-      const shares = SOC.trustedMe().filter(function (t) { return t.status === 'accepted'; });
-      holder.hidden = !shares.length;
-      const ul = h('ul', { class: 'nav-list' });
-      holder.replaceChildren(ul);
-      shares.forEach(function (t) {
-        SOC.getProfile(t.owner).then(function (p) {
-          if (!p) return;
-          const here = view === 'shared' && location.hash.slice(3).toLowerCase() === p.username.toLowerCase();
-          ul.appendChild(h('li', null, h('a', { class: 'nav-item', href: '#d/' + p.username, 'aria-current': here ? 'page' : null, title: p.name + '\u2019s dashboard (shared with you)' },
-            avatar(p, p.avatar, 1.25), h('span', { class: 'nav-shared-name nav-label' }, p.name.split(' ')[0] + '\u2019s dashboard'))));
-        }).catch(function () {});
-      });
-    }
-    draw();
-    trustWatchers.push(function () { if (!holder.isConnected) return false; draw(); });
-    return holder;
-  }
-
   /* ---------- Your picture in the sidebar: a small menu to pick your status ---------- */
 
   function statusMenu(user, here) {
@@ -1891,7 +1869,6 @@
         h('ul', { class: 'nav-list' },
           item('dashboard', '#dashboard', 'Dashboard',
             h('span', { class: 'nav-pin', title: 'Private: only you can see your dashboard' }, icon('pin'), h('span', { class: 'vh' }, '(private)'))),
-          sharedNav(view),
           item('feed', '#feed', 'Feed'),
           item('circle', '#circle', 'Circle'),
           h('li', null, h('button', {
@@ -4615,14 +4592,15 @@
     /* The dashboard always opens on the Overview. */
     pickTab('overview');
 
+    const trust = book.mine ? trustCard() : null;
     return h('div', { class: 'wide' },
       h('section', { class: 'identity' },
-        avatar(user, user.avatar, 3.25),
+        idAvatar(user, book),
         h('div', null,
           h('h1', null, user.name),
           user.bio ? h('p', { class: 'small muted' }, user.bio) : null),
-        book.mine ? privatePin() : sharedBadge(book)),
-      book.mine ? trustCard() : null,
+        book.mine ? privatePin(trust) : sharedBadge(book)),
+      trust,
       h('div', { class: 'dash-tabs', role: 'tablist', 'aria-label': 'Dashboard sections' }, tabButtons),
       overviewPanel,
       trackerPanel,
@@ -4859,13 +4837,51 @@
     return api;
   }
 
+  /* ---------- Your picture with small circles for dashboards shared with you ---------- */
+
+  /**
+   * On your dashboard: one small circle per person who shared their dashboard with you; tap to open it.
+   * On someone else's dashboard: a small circle of you, to go back to yours.
+   */
+  function idAvatar(user, book) {
+    const wrap = h('div', { class: 'id-avatar' }, avatar(user, user.avatar, 3.25));
+    const dots = h('div', { class: 'id-shares' });
+    wrap.appendChild(dots);
+    function draw() {
+      dots.replaceChildren();
+      if (!book.mine) {
+        const me = BT.currentUser();
+        if (!me) return;
+        dots.appendChild(h('a', { class: 'id-share', href: '#dashboard', title: 'Back to your dashboard', 'aria-label': 'Back to your dashboard' }, avatar(me, me.avatar, 1.5)));
+        return;
+      }
+      SOC.trustedMe().filter(function (t) { return t.status === 'accepted'; }).forEach(function (t) {
+        SOC.getProfile(t.owner).then(function (p) {
+          if (!p) return;
+          const label = 'Open ' + p.name.split(' ')[0] + '\u2019s dashboard';
+          dots.appendChild(h('a', { class: 'id-share', href: '#d/' + p.username, title: label, 'aria-label': label }, avatar(p, p.avatar, 1.5)));
+        }).catch(function () {});
+      });
+    }
+    draw();
+    trustWatchers.push(function () { if (!wrap.isConnected) return false; draw(); });
+    return wrap;
+  }
+
   /* ---------- Trusted person ---------- */
 
   /** "Private" or "Shared with Ana only", next to your name on the dashboard. */
-  function privatePin() {
-    const pin = h('span', { class: 'private-pin' });
+  function privatePin(trust) {
+    const pin = h('button', { type: 'button', class: 'private-pin', 'aria-expanded': 'false', 'aria-controls': 'trust-card' });
+    pin.addEventListener('click', function () {
+      if (!trust) return;
+      const open = !trust.classList.contains('open');
+      trust.classList.toggle('open', open);
+      pin.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
     function draw() {
       const t = SOC.myTrust();
+      if (!t && trust) trust.classList.remove('open');
       const shared = t && t.status === 'accepted';
       if (shared) {
         SOC.getProfile(t.member).then(function (p) {
@@ -4873,6 +4889,9 @@
           pin.replaceChildren(icon('pin'), h('span', null, 'Shared with ' + p.name.split(' ')[0] + ' only'));
           pin.title = 'Only you and ' + p.name + ' can see this dashboard. The rest of your circle can’t.';
         }).catch(function () {});
+      } else if (t) {
+        pin.replaceChildren(icon('pin'), h('span', null, 'Invite pending'));
+        pin.title = 'Your invite hasn’t been accepted yet. Tap to manage it.';
       } else {
         pin.replaceChildren(icon('pin'), h('span', null, 'Private · only you can see this'));
         pin.title = 'Your dashboard is private. People in your circle can’t see your budget or entries.';
@@ -4920,7 +4939,7 @@
 
   /** The dashboard card where you invite your one trusted person. */
   function trustCard() {
-    const card = h('section', { class: 'trust-card', 'aria-label': 'Trusted person' });
+    const card = h('section', { class: 'trust-card', id: 'trust-card', 'aria-label': 'Trusted person' });
     let choosing = false;
 
     function draw() {
