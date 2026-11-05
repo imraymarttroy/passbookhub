@@ -2127,23 +2127,50 @@
     return h('li', null, btn);
   }
 
-  /* "Install app": shows when the browser can install PassbookHub (Chrome, Edge), hidden once installed. */
+  /* "Install app": shows when the browser can install PassbookHub (Chrome, Edge), hidden once installed.
+     After you accept the browser's prompt it turns into a small loader (logo + progress bar) until the install finishes. */
   function installButton() {
+    const DOWNLOAD = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.5 9 10 12.5 13.5 9M4 15.5h12"/></svg>';
+    const LOGO = '<svg class="install-logo" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" aria-hidden="true"><path d="M7 22h18"/><path d="M7 16h11"/><path d="M7 10h7"/></svg>';
+    const CHECK = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 10.5 8 14l7.5-8"/></svg>';
+    let phase = 'idle', timer = null;
     const b = h('button', { type: 'button', class: 'install-btn', title: 'Install PassbookHub as an app', hidden: true,
       onclick: async function () {
         const p = window.__pbhInstall;
-        if (!p) return;
+        if (!p || phase !== 'idle') return;
         p.prompt();
-        try { const r = await p.userChoice; if (r && r.outcome === 'accepted') { window.__pbhInstall = null; sync(); } } catch (e) { /* ignore */ }
+        try {
+          const r = await p.userChoice;
+          if (r && r.outcome === 'accepted') { window.__pbhInstall = null; installing(); }
+        } catch (e) { /* ignore */ }
       } });
-    b.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.5 9 10 12.5 13.5 9M4 15.5h12"/></svg><span>Install app</span>';
+    function paint(svg, label) { b.innerHTML = svg + '<span>' + label + '</span><i class="install-bar" aria-hidden="true"></i>'; }
+    function installing() {
+      phase = 'installing';
+      b.classList.add('is-installing'); b.disabled = true; b.hidden = false;
+      b.setAttribute('aria-busy', 'true');
+      paint(LOGO, 'Installing\u2026');
+      /* The browser does not report progress, so the bar eases toward the end and fills once the install is done. */
+      timer = setTimeout(done, 15000);
+    }
+    function done() {
+      if (phase !== 'installing') return;
+      phase = 'done'; clearTimeout(timer);
+      b.classList.remove('is-installing'); b.classList.add('is-installed'); b.removeAttribute('aria-busy');
+      paint(CHECK, 'Installed');
+      setTimeout(function () { phase = 'gone'; b.hidden = true; }, 1800);
+    }
+    paint(DOWNLOAD, 'Install app');
     const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
     function sync() {
-      if (!b.isConnected && b.dataset.mounted) { document.removeEventListener('pbh-installable', sync); return; }
+      if (!b.isConnected && b.dataset.mounted) { document.removeEventListener('pbh-installable', sync); window.removeEventListener('appinstalled', done); return; }
+      if (phase === 'installing') { if (!window.__pbhInstall) done(); return; }
+      if (phase !== 'idle') return;
       b.hidden = standalone || !window.__pbhInstall;
     }
     setTimeout(function () { b.dataset.mounted = '1'; }, 0);
     document.addEventListener('pbh-installable', sync);
+    window.addEventListener('appinstalled', done);
     sync();
     return b;
   }

@@ -3642,6 +3642,23 @@ body.auth-body .narrow, #app > .narrow {
 .install-btn[hidden] { display: none; }
 .install-btn:hover { background: var(--wash); border-color: var(--line-strong); }
 .install-btn svg { width: 1rem; height: 1rem; flex: none; }
+.install-btn { position: relative; overflow: hidden; }
+.install-btn .install-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--brand); opacity: 0; }
+.install-btn.is-installing { cursor: progress; border-color: var(--line-strong); }
+.install-btn.is-installing .install-bar { opacity: 1; animation: install-bar 12s cubic-bezier(0.1, 0.7, 0.2, 1) forwards; }
+.install-btn.is-installing .install-logo path { animation: install-line 1.2s ease-in-out infinite; transform-origin: 7px 50%; }
+.install-btn.is-installing .install-logo path:nth-child(2) { animation-delay: 0.15s; }
+.install-btn.is-installing .install-logo path:nth-child(3) { animation-delay: 0.3s; }
+.install-btn.is-installed { color: var(--good); border-color: var(--good); }
+.install-btn.is-installed .install-bar { opacity: 1; width: 100%; background: var(--good); transition: width 0.3s ease; }
+.install-btn:disabled { opacity: 1; }
+.install-btn:disabled:hover { background: transparent; }
+@keyframes install-bar { from { width: 0; } to { width: 92%; } }
+@keyframes install-line { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(0.45); opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) {
+  .install-btn.is-installing .install-logo path { animation: none; }
+  .install-btn.is-installing .install-bar { animation: none; width: 60%; }
+}
 @media (min-width: 761px) { .collapsed .install-btn span { display: none; } .collapsed .install-btn { width: 2.25rem; justify-content: center; padding: 0.5rem 0; } }
 /* Installed app: a touch more room at the top, no browser bar above it */
 @media (display-mode: standalone) { .install-btn { display: none !important; } }
