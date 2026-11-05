@@ -1934,8 +1934,9 @@
     return h('button', {
       type: 'button', class: 'version-btn' + (extra || ' top-version') + (fresh ? ' is-new' : ''), title: 'What\u2019s new in v' + version,
       'aria-label': 'What\u2019s new in version ' + version, 'data-no-translate': '',
-      onclick: function () { if (window.WHATS_NEW) WHATS_NEW.show(uid); }
-    }, h('span', { class: 'version-dot', 'aria-hidden': 'true' }), 'v' + version);
+      onclick: function () { if (window.WHATS_NEW) (WHATS_NEW.showUpdate || WHATS_NEW.show)(uid); }
+    }, h('span', { class: 'version-dot', 'aria-hidden': 'true' }), h('span', { class: 'version-num' }, 'v' + version),
+      h('span', { class: 'version-hint' }, fresh ? 'Update' : 'What\u2019s new'));
   }
 
   /* "3 online": people in your circle with the app open right now. Hidden when the sidebar is collapsed. */
@@ -2183,7 +2184,7 @@
               BT.signOut();
             }
           }, navIcon('signout'), h('span', { class: 'nav-label' }, 'Sign out'))))),
-      h('div', { class: 'sidebar-foot' }, versionButton(' side-version'), onlineBadge()));
+      h('div', { class: 'sidebar-foot' }, onlineBadge(), versionButton(' side-version')));
     drawBadges();
     const shellEl = h('div', { class: 'app-shell' },
       h('div', { class: 'bg-orbs', 'aria-hidden': 'true' }, h('span'), h('span')),

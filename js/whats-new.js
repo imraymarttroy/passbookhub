@@ -15,8 +15,25 @@ window.WHATS_NEW = (function () {
    * Bump it with every release and update CHANGES below. A new version shows the tour once more,
    * even for people who ticked "Don't show this again".
    */
-  const APP_VERSION = '2.0.0';
-  const FEATURES_VERSION = APP_VERSION;
+  const APP_VERSION = '2.1.0';
+  /* The full tour on login only comes back when this changes; small updates use the minimal popup instead. */
+  const FEATURES_VERSION = '2.0.0';
+
+  /* What changed in APP_VERSION, shown in the minimal update popup (version button in the sidebar). */
+  const UPDATE = {
+    en: { title: 'What\u2019s new', close: 'Close', ok: 'Got it', items: [
+      ['New Overview', 'Safe-to-spend, 50/30/20 progress, budget limits, bills and cashflow on one screen.'],
+      ['Quick add', 'Add an expense or income right from the Overview.'],
+      ['Ask PassbookHub AI', 'A cleaner side panel that slides in from the right.'],
+      ['Coming soon', 'Community and Blog are in the sidebar, locked for now.']
+    ] },
+    fil: { title: 'Ano ang bago', close: 'Isara', ok: 'Sige', items: [
+      ['Bagong Overview', 'Safe-to-spend, 50/30/20 progress, budget limits, bayarin at cashflow sa iisang screen.'],
+      ['Quick add', 'Mag-add ng gastos o kita mula mismo sa Overview.'],
+      ['Ask PassbookHub AI', 'Mas malinis na side panel na lumalabas mula sa kanan.'],
+      ['Malapit na', 'Nasa sidebar na ang Community at Blog, naka-lock muna.']
+    ] }
+  };
 
   const TEXT = {
     en: {
@@ -401,6 +418,35 @@ window.WHATS_NEW = (function () {
     nextBtn.focus();
   }
 
+  /** Minimal "what's new" popup for the current version. Opens over the page; close with X, Esc or a click outside. */
+  function showUpdate(uid) {
+    if (document.querySelector('.wu-overlay')) return;
+    const t = UPDATE[lang()];
+    const opener = document.activeElement;
+    function close() {
+      document.removeEventListener('keydown', onKey);
+      overlay.classList.add('wu-out');
+      setTimeout(function () { overlay.remove(); }, reduced() ? 0 : 160);
+      if (opener && opener.focus && document.contains(opener)) opener.focus();
+    }
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
+    const okBtn = el('button', { type: 'button', class: 'wu-ok', onclick: close }, t.ok);
+    const card = el('div', { class: 'wu-card', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'wu-title' },
+      el('div', { class: 'wu-head' },
+        el('div', {}, el('p', { class: 'wu-label' }, 'v' + APP_VERSION), el('h2', { id: 'wu-title' }, t.title)),
+        el('button', { type: 'button', class: 'wu-x', 'aria-label': t.close, onclick: close }, icon('x'))),
+      el('ul', { class: 'wu-list' }, t.items.map(function (it) {
+        return el('li', {}, el('p', { class: 'wu-item' }, it[0]), el('p', { class: 'wu-desc' }, it[1]));
+      })),
+      el('div', { class: 'wu-foot' }, okBtn));
+    const overlay = el('div', { class: 'wu-overlay', 'data-no-translate': '', onclick: function (e) { if (e.target === overlay) close(); } }, card);
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', onKey);
+    markSeen(uid);
+    document.querySelectorAll('.version-btn').forEach(function (b) { b.classList.remove('is-new'); });
+    okBtn.focus();
+  }
+
   function resetSession() {
     try {
       Object.keys(sessionStorage).forEach(function (k) { if (k.indexOf('pbh-features-seen:') === 0) sessionStorage.removeItem(k); });
@@ -410,11 +456,12 @@ window.WHATS_NEW = (function () {
   /** Closes the tour right away (for example when you sign out). */
   function closeNow() {
     document.querySelectorAll('.wn-overlay').forEach(function (o) { if (o.closeTour) o.closeTour(); else o.remove(); });
+    document.querySelectorAll('.wu-overlay').forEach(function (o) { o.remove(); });
   }
 
   /** True until this person opens the tour for the current version (lights the dot on the version button). */
   function isNew(uid) { return get('localStorage', 'pbh-version-seen:' + (uid || 'anon')) !== APP_VERSION; }
   function markSeen(uid) { set('localStorage', 'pbh-version-seen:' + (uid || 'anon'), APP_VERSION); }
 
-  return { showOnLogin: showFeaturesOnLogin, show: showFeatures, close: closeNow, resetSession: resetSession, version: APP_VERSION, isNew: isNew, markSeen: markSeen };
+  return { showOnLogin: showFeaturesOnLogin, show: showFeatures, showUpdate: showUpdate, close: closeNow, resetSession: resetSession, version: APP_VERSION, isNew: isNew, markSeen: markSeen };
 })();

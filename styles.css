@@ -3185,7 +3185,51 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 /* Version button sits above the online count in the sidebar (top bar on small screens). */
 .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
 .sidebar-foot .sidebar-online { margin-top: 0; }
-.side-version { width: 100%; justify-content: flex-start; padding: 0 0.75rem; }
+.side-version {
+  width: 100%; height: auto; justify-content: flex-start; padding: 0.25rem 0.75rem;
+  border: 0 !important; background: none !important; box-shadow: none; color: var(--ink-2); font-weight: 500;
+}
+.side-version .version-dot { display: none; }
+.side-version.is-new .version-dot { display: inline-block; }
+.side-version .version-hint { opacity: 0; transform: translateX(-4px); transition: opacity 0.15s, transform 0.15s; }
+.side-version:hover .version-hint, .side-version:focus-visible .version-hint, .side-version.is-new .version-hint { opacity: 1; transform: none; }
+.side-version:hover { color: var(--ink); }
+.side-version .version-hint::before { content: '\00b7'; margin-right: 0.375rem; }
 .top-version { display: none; }
 @media (min-width: 761px) { .collapsed .side-version { display: none; } }
 @media (max-width: 760px) { .sidebar-foot { display: none; } .top-version { display: inline-flex; } }
+
+/* Minimal "what's new" popup */
+.wu-overlay { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 1rem; background: rgba(0, 0, 0, 0.5); animation: wu-fade 0.16s ease-out; }
+.wu-overlay.wu-out { opacity: 0; transition: opacity 0.16s; }
+@keyframes wu-fade { from { opacity: 0; } to { opacity: 1; } }
+.wu-card {
+  width: min(24rem, 100%); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.25rem;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--page); color: var(--ink); box-shadow: none;
+}
+.wu-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.wu-label { margin: 0 0 0.25rem; font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.wu-head h2 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.wu-x { display: grid; place-items: center; width: 2rem; height: 2rem; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--ink-2); cursor: pointer; }
+.wu-x:hover { background: var(--wash); color: var(--ink); }
+.wu-x svg, .wu-x .wn-svg svg { width: 1rem; height: 1rem; }
+.wu-x .wn-svg { display: grid; place-items: center; }
+.wu-list { list-style: none; margin: 0; padding: 0; }
+.wu-list li { padding: 0.75rem 0; border-top: 1px solid var(--line); }
+.wu-item { margin: 0; font-size: 0.875rem; font-weight: 500; }
+.wu-desc { margin: 0.25rem 0 0; font-size: 0.8125rem; color: var(--ink-2); line-height: 1.45; }
+.wu-foot { display: flex; justify-content: flex-end; padding-top: 0.75rem; border-top: 1px solid var(--line); }
+.wu-ok { padding: 0.4375rem 1rem; border: 1px solid var(--line-strong); border-radius: 999px; background: transparent; color: var(--ink); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.wu-ok:hover { border-color: var(--ink); }
+
+/* Ask PassbookHub AI: sparkle + label in a thin pill; the shine sweeps on hover */
+@media (min-width: 761px) {
+  .top-btn.ai-top-btn, .top-btn.ai-top-btn:hover {
+    width: auto; height: 2.25rem; padding: 0 0.875rem 0 0.625rem; gap: 0.5rem;
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink);
+  }
+  .top-btn.ai-top-btn:hover { border-color: var(--ink-2); }
+  .ai-top-btn .top-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 0.8125rem; font-weight: 500; }
+  .ai-top-btn svg { width: 1.125rem; height: 1.125rem; color: var(--accent); }
+}
