@@ -11,6 +11,14 @@ window.BT = (function () {
     { id: 'savings', label: 'Savings', share: 20, hint: 'Emergency fund, investments, extra debt payments.' }
   ];
   const TYPE_LABELS = { income: 'Income', needs: 'Needs', wants: 'Wants', savings: 'Savings' };
+  /* Optional details on an entry: a finer category and how it was paid. Suggestions only; any text up to 40 characters. */
+  const CATEGORY_SUGGESTIONS = {
+    income: ['Salary', 'Business', 'Freelance', 'Allowance', 'Bonus', 'Gift', 'Interest', 'Other income'],
+    needs: ['Rent', 'Groceries', 'Utilities', 'Transport', 'Internet', 'Phone', 'Health', 'Insurance', 'Debt payment', 'Education'],
+    wants: ['Food & dining', 'Shopping', 'Entertainment', 'Subscriptions', 'Travel', 'Hobbies', 'Personal care', 'Gifts'],
+    savings: ['Emergency fund', 'Investments', 'Retirement', 'Goal savings', 'Extra debt payment']
+  };
+  const PAYMENT_METHODS = ['Cash', 'GCash', 'Maya', 'Bank transfer', 'Debit card', 'Credit card', 'Other'];
   const CURRENCIES = ['PHP', 'USD', 'EUR', 'GBP', 'CAD', 'AUD', 'NZD', 'SGD', 'JPY', 'KRW', 'CNY', 'HKD', 'INR', 'IDR', 'MYR', 'THB', 'VND', 'AED', 'SAR', 'ZAR', 'BRL', 'MXN', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN'];
   const REGION_CURRENCY = {
     US: 'USD', GB: 'GBP', PH: 'PHP', CA: 'CAD', AU: 'AUD', NZ: 'NZD', SG: 'SGD', JP: 'JPY', KR: 'KRW', CN: 'CNY',
@@ -886,13 +894,13 @@ window.BT = (function () {
       return '"' + text.replace(/"/g, '""') + '"';
     }
     const rows = transactions.slice().sort(function (a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
-    return ['Date,Category,Description,Amount'].concat(rows.map(function (t) {
-      return [cell(t.date), cell(TYPE_LABELS[t.type]), cell(t.desc), (t.cents / 100).toFixed(2)].join(',');
+    return ['Date,Type,Category,Payment method,Description,Amount'].concat(rows.map(function (t) {
+      return [cell(t.date), cell(TYPE_LABELS[t.type]), cell(t.category || ''), cell(t.method || ''), cell(t.desc), (t.cents / 100).toFixed(2)].join(',');
     })).join('\r\n');
   }
 
   return {
-    BUCKETS: BUCKETS, TYPE_LABELS: TYPE_LABELS, CURRENCIES: CURRENCIES, currencyLabel: currencyLabel, flagUrl: flagUrl,
+    BUCKETS: BUCKETS, TYPE_LABELS: TYPE_LABELS, CATEGORY_SUGGESTIONS: CATEGORY_SUGGESTIONS, PAYMENT_METHODS: PAYMENT_METHODS, CURRENCIES: CURRENCIES, currencyLabel: currencyLabel, flagUrl: flagUrl,
     RESEND_COOLDOWN_MS: RESEND_COOLDOWN_MS, MIN_AGE: MIN_AGE,
     countryFlagUrl: countryFlagUrl, countries: countries, countryName: countryName,
     updateAccountDetails: updateAccountDetails, changeEmail: changeEmail,

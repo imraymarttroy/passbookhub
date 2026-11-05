@@ -52,8 +52,11 @@ service cloud.firestore {
         allow read: if signedInAs(uid) || trustedBy(uid);
         allow delete: if signedInAs(uid) || trustedEditorOf(uid);
         allow create, update: if (signedInAs(uid) || trustedEditorOf(uid))
-          && request.resource.data.keys().hasOnly(['type', 'desc', 'cents', 'date', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['type', 'desc', 'cents', 'date', 'createdAt', 'category', 'method'])
           && request.resource.data.type in ['income', 'needs', 'wants', 'savings']
+          // Optional: a finer category (e.g. Food, Rent) and how it was paid (e.g. Cash, GCash).
+          && (!('category' in request.resource.data) || (request.resource.data.category is string && request.resource.data.category.size() <= 40))
+          && (!('method' in request.resource.data) || (request.resource.data.method is string && request.resource.data.method.size() <= 40))
           && request.resource.data.desc is string && request.resource.data.desc.size() <= 80
           && request.resource.data.cents is int && request.resource.data.cents > 0
           && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');

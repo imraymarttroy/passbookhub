@@ -3662,3 +3662,33 @@ body.auth-body .narrow, #app > .narrow {
 @media (min-width: 761px) { .collapsed .install-btn span { display: none; } .collapsed .install-btn { width: 2.25rem; justify-content: center; padding: 0.5rem 0; } }
 /* Installed app: a touch more room at the top, no browser bar above it */
 @media (display-mode: standalone) { .install-btn { display: none !important; } }
+
+/* ---------- Transactions: same minimalist cards as the Overview ---------- */
+.tl-top { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
+.tl-search-wrap { display: flex; align-items: center; gap: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--line); color: var(--ink-2); cursor: text; }
+.tl-search-wrap svg { width: 0.95rem; height: 0.95rem; flex: none; }
+.tl-search { flex: 1; min-width: 0; padding: 0.25rem 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--ink); font: inherit; font-size: 0.875rem; outline: none; }
+.tl-pills { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.875rem; }
+.tl-pill {
+  width: auto !important; min-width: 0; max-width: 100%; height: auto !important; min-height: 0 !important; line-height: 1.4; margin: 0;
+  padding: 0.3125rem 1.75rem 0.3125rem 0.75rem !important; border: 1px solid var(--line) !important; border-radius: 999px !important;
+  background-color: transparent !important; box-shadow: none !important; color: var(--ink-2); font: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.tl-pill:hover, .tl-pill.on { border-color: var(--ink) !important; color: var(--ink); }
+.tl-date-in { padding-right: 0.75rem !important; font-size: 0.75rem !important; color-scheme: light dark; }
+.tl-custom { display: inline-flex; align-items: center; gap: 0.375rem; }
+.tl-custom[hidden] { display: none; }
+.tl-exports { display: inline-flex; gap: 0.875rem; }
+.tl-group.next { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+.tl-group .mo-card-head { margin-bottom: 0.25rem; }
+.tl-list .mo-list-main .mo-faint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-right { display: inline-flex; align-items: center; gap: 0.5rem; flex: none; white-space: nowrap; }
+.tl-tools { display: inline-flex; gap: 0.125rem; opacity: 0; transition: opacity 0.15s; }
+.tl-row:hover .tl-tools, .tl-row:focus-within .tl-tools { opacity: 1; }
+@media (hover: none) { .tl-tools { opacity: 1; } }
+.tl-icon { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--ink-2); cursor: pointer; }
+.tl-icon:hover { background: var(--wash); color: var(--ink); }
+.tl-icon svg { width: 0.95rem; height: 0.95rem; }
+@media (max-width: 760px) {
+  .tl-top { grid-template-columns: minmax(0, 1fr); }
+}

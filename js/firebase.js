@@ -38,11 +38,11 @@ try {
   await import('./i18n.js?v=8');
   await import('./banks.js?v=2');
   await import('./quotes.js?v=2');
-  await import('./core.js?v=17');
+  await import('./core.js?v=18');
   await import('./social.js?v=24');
-  await import('./overview.js?v=6');
+  await import('./overview.js?v=7');
   await import('./whats-new.js?v=4');
-  await import('./app.js?v=67');
+  await import('./app.js?v=68');
 } catch (error) {
   console.error(error);
   fail('PassbookHub could not start. Check your internet connection and reload the page.');

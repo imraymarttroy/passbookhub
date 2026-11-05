@@ -1365,7 +1365,7 @@ window.OVERVIEW = (function () {
         })) : moEmpty('No transactions yet.'),
         h('div', { class: 'mo-actions' },
           book.canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { ctx.openTab('budget'); } }, '+ Add expense / income') : null,
-          h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openTab('entries'); } }, 'See all')));
+          h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openTab('transactions'); } }, 'See all')));
       /* Upcoming bills: debts you owe with a due date in the next 7 days (and any overdue). */
       const debts = data.debts || [];
       const leftOf = function (d) { return Math.max(0, d.cents - (d.paidCents || 0)); };
