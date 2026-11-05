@@ -2111,6 +2111,26 @@
     return h('li', null, btn);
   }
 
+  /* Sign out sits under the online count on big screens and stays in the nav bar on phones. */
+  function signOutButton() {
+    return h('button', {
+      type: 'button',
+      class: 'nav-item nav-signout',
+      onclick: function () {
+        toastBox.hidden = true;
+        state.notice = 'You have signed out.';
+        socialFor = null;
+        SOC.stopWatching();
+        SOC.stopWatchingChats();
+        SOC.stopWatchingTrust();
+        SOC.stopPresence();
+        onlineCache = null;
+        location.hash = '#signin';
+        BT.signOut();
+      }
+    }, navIcon('signout'), h('span', { class: 'nav-label' }, 'Sign out'));
+  }
+
   function messagesBadge() {
     const badge = h('span', { class: 'nav-badge', hidden: true, 'data-kind': 'messages' });
     badges.push(badge);
@@ -2169,23 +2189,8 @@
           lockedItem('Community'),
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
-          h('li', null, h('button', {
-            type: 'button',
-            class: 'nav-item',
-            onclick: function () {
-              toastBox.hidden = true;
-              state.notice = 'You have signed out.';
-              socialFor = null;
-              SOC.stopWatching();
-              SOC.stopWatchingChats();
-              SOC.stopWatchingTrust();
-              SOC.stopPresence();
-              onlineCache = null;
-              location.hash = '#signin';
-              BT.signOut();
-            }
-          }, navIcon('signout'), h('span', { class: 'nav-label' }, 'Sign out'))))),
-      h('div', { class: 'sidebar-foot' }, onlineBadge(), versionButton(' side-version')));
+          h('li', { class: 'nav-signout-li' }, signOutButton()))),
+      h('div', { class: 'sidebar-foot' }, onlineBadge(), signOutButton(), versionButton(' side-version')));
     drawBadges();
     const shellEl = h('div', { class: 'app-shell' },
       h('div', { class: 'bg-orbs', 'aria-hidden': 'true' }, h('span'), h('span')),
