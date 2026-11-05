@@ -6018,7 +6018,8 @@
       SOC.markAllRead().catch(function () {});
     }
   });
-  root.replaceChildren(h('div', { class: 'narrow' }, h('p', { class: 'muted', role: 'status' }, 'Loading…')));
+  /* No visible loading screen: the page stays blank for the moment it takes to start (screen readers still hear it). */
+  root.replaceChildren(h('p', { class: 'vh', role: 'status' }, 'Loading…'));
   window.addEventListener('hashchange', function () { if (state.view !== null) render(); });
   BT.onSessionChange(render);
 })();

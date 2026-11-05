@@ -42,7 +42,7 @@ try {
   await import('./social.js?v=24');
   await import('./overview.js?v=6');
   await import('./whats-new.js?v=4');
-  await import('./app.js?v=60');
+  await import('./app.js?v=61');
 } catch (error) {
   console.error(error);
   fail('PassbookHub could not start. Check your internet connection and reload the page.');
