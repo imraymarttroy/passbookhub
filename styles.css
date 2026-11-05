@@ -3629,3 +3629,6 @@ body.auth-body .narrow, #app > .narrow {
   .set-page .set-tabs { display: flex; width: 100%; }
   .set-page .set-tabs .dash-tab { flex: 1; }
 }
+.set-page .currency-button { background: transparent !important; border: 1px solid var(--line-strong) !important; border-radius: 10px !important; box-shadow: none !important; }
+.set-page .currency-list { background: var(--page) !important; border: 1px solid var(--line) !important; border-radius: 10px !important; box-shadow: none !important; }
+.set-page .currency-option:hover, .set-page .currency-option[aria-selected="true"] { background: var(--wash) !important; }
