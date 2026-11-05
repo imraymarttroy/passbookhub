@@ -303,6 +303,7 @@
       view = back;
       setTimeout(function () { if (username) dock.open(username); else dock.openPicker(); }, 0);
     }
+    if (!BT.currentUser() && window.WHATS_NEW) WHATS_NEW.resetSession();
     if (!BT.currentUser() && socialFor) { socialFor = null; SOC.stopWatching(); SOC.stopWatchingChats(); SOC.stopWatchingTrust(); SOC.stopPresence(); onlineCache = null; }
     if (state.cleanup) { state.cleanup(); state.cleanup = null; }
     state.onTrustChange = null;
@@ -322,6 +323,11 @@
       root.replaceChildren(content);
     }
     dock.sync(SHELL_VIEWS.indexOf(view) !== -1);
+    if (SHELL_VIEWS.indexOf(view) !== -1 && BT.currentUser() && window.WHATS_NEW) {
+      /* Features pop-up: once per login, after the page has painted. */
+      const uid = BT.currentUser().id;
+      setTimeout(function () { WHATS_NEW.showOnLogin(uid); }, 400);
+    }
     if (changed) {
       window.scrollTo(0, 0);
       const heading = root.querySelector('h1');
