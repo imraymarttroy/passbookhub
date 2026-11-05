@@ -3336,5 +3336,4 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 /* Sidebar foot: online count, then Sign out, then the version */
 @media (min-width: 761px) { .nav-signout-li { display: none; } }
 .sidebar-foot .nav-signout { padding: 0.5rem 0.75rem; }
-.collapsed .sidebar-foot { display: flex; }
 @media (min-width: 761px) { .collapsed .sidebar-foot .nav-signout { justify-content: center; padding: 0.625rem; } }
