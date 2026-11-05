@@ -2613,3 +2613,129 @@ button.ov-goal:hover { border-color: var(--line-strong); }
   .wn-navs { width: 100%; }
   .wn-nav { flex: 1; justify-content: center; }
 }
+
+/* =====================================================================
+ * Glow theme: the Terms & Privacy / features-tour look across the whole app.
+ * Glowing drifting blobs, glassy panels, rounder cards, pill buttons,
+ * gradient page titles and soft bouncy motion. Look only; no layout logic.
+ * Remove this block to go back to the flat design.
+ * ===================================================================== */
+:root {
+  --glow-a: #b1e5f2; --glow-b: #cfc8ff; --glow-c: #ffd9c2;
+  --glow-shadow: 0 1px 2px rgba(39,38,53,.05), 0 12px 32px -14px rgba(39,38,53,.28);
+  --glow-shadow-lift: 0 2px 4px rgba(39,38,53,.06), 0 22px 44px -18px rgba(39,38,53,.38);
+  --glass: color-mix(in srgb, var(--surface) 78%, transparent);
+  --bounce: cubic-bezier(.3,1.4,.5,1);
+}
+:root[data-theme="dark"] {
+  --glow-a: #2f6e7e; --glow-b: #463b8c; --glow-c: #7a4a35;
+  --glow-shadow: 0 1px 2px rgba(0,0,0,.25), 0 14px 34px -14px rgba(0,0,0,.6);
+  --glow-shadow-lift: 0 2px 4px rgba(0,0,0,.3), 0 24px 48px -18px rgba(0,0,0,.75);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --glow-a: #2f6e7e; --glow-b: #463b8c; --glow-c: #7a4a35;
+    --glow-shadow: 0 1px 2px rgba(0,0,0,.25), 0 14px 34px -14px rgba(0,0,0,.6);
+    --glow-shadow-lift: 0 2px 4px rgba(0,0,0,.3), 0 24px 48px -18px rgba(0,0,0,.75);
+  }
+}
+
+/* ---- Background glow (undoes the flat-design rule above) ---- */
+.bg-orbs, .auth-glow, .pf-hero-glow { display: block !important; }
+.bg-orbs { filter: blur(60px); opacity: .75; }
+:root[data-theme="light"] .bg-orbs { opacity: .7; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .bg-orbs { opacity: .7; } }
+.bg-orbs span:first-child { background: var(--glow-a); width: 34rem; height: 34rem; }
+.bg-orbs span:last-child { background: var(--glow-b); width: 30rem; height: 30rem; opacity: .9; }
+.bg-orbs::after { content: ""; position: absolute; width: 24rem; height: 24rem; left: 40%; top: 35%; border-radius: 50%; background: var(--glow-c); opacity: .6;
+  animation: orb-b 90s ease-in-out infinite alternate-reverse; }
+:root[data-theme="light"] .bg-orbs span { opacity: .9; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .bg-orbs span { opacity: .9; } }
+.auth-glow span:first-child { background: var(--glow-a); opacity: .5; }
+.auth-glow span:last-child { background: var(--glow-b); opacity: .5; }
+
+/* ---- Glass sidebar ---- */
+.sidebar { background: var(--glass); backdrop-filter: saturate(1.5) blur(18px); -webkit-backdrop-filter: saturate(1.5) blur(18px);
+  border-right-color: color-mix(in srgb, var(--line) 70%, transparent); }
+.nav-item, .sidebar-me { border-radius: 14px; transition: background .2s, transform .25s var(--bounce), color .2s; }
+.nav-item:hover { transform: translateX(3px); }
+.nav-item[aria-current="page"] {
+  background: linear-gradient(100deg, color-mix(in srgb, var(--glow-a) 55%, transparent), color-mix(in srgb, var(--glow-b) 35%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent); font-weight: 700;
+}
+
+/* ---- Page titles: gradient like the tour and Terms page (not over cover photos) ---- */
+.app-main .wide h1:not(.pf-hero *):not(.set-hero *) {
+  font-weight: 800; letter-spacing: -0.02em;
+  background: linear-gradient(100deg, var(--ink) 25%, color-mix(in srgb, var(--accent) 55%, #6a5acd)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+:root[data-theme="dark"] .app-main .wide h1:not(.pf-hero *):not(.set-hero *) { background-image: linear-gradient(100deg, #fff 15%, var(--brand)); }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .app-main .wide h1:not(.pf-hero *):not(.set-hero *) { background-image: linear-gradient(100deg, #fff 15%, var(--brand)); }
+}
+
+/* ---- Cards: rounder, softly lifted, glassy ---- */
+.ov-card, .ov-kpi, .ov-health, .post, .prompt, .trust-card, .pf-card, .set-card, .ask-card, .stmt-card, .note-card, .acct-card,
+.otp-card, .lang-card, .pf-edit-card, .ov-suggest {
+  border-radius: 20px; border-color: color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--glow-shadow);
+  transition: transform .3s var(--bounce), box-shadow .3s, border-color .3s;
+}
+.ov-kpi:hover, .post:hover, .pf-card:hover, .ov-card:hover, .set-card:hover {
+  transform: translateY(-2px); box-shadow: var(--glow-shadow-lift); border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+}
+.pf-hero, .set-hero { border-radius: 24px; box-shadow: var(--glow-shadow); overflow: hidden; }
+.bank-card { border-radius: 20px; box-shadow: var(--glow-shadow); transition: transform .3s var(--bounce), box-shadow .3s; }
+.bank-card::after { display: block; }
+button.bank-card:hover { transform: translateY(-3px) rotate(-.5deg); box-shadow: var(--glow-shadow-lift); }
+.ov-health { border-left-width: 6px; }
+.meter, .ov-kpi .meter { border-radius: 99px; overflow: hidden; }
+
+/* ---- Buttons: pills with a little bounce ---- */
+.btn { border-radius: 999px; font-weight: 650; padding-inline: 1.125rem; transition: transform .25s var(--bounce), background .2s, box-shadow .25s, opacity .2s; }
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+  box-shadow: 0 8px 18px -10px var(--accent); }
+.btn.primary:hover:not(:disabled) { opacity: 1; background: var(--accent); box-shadow: 0 12px 24px -10px var(--accent); }
+.btn.small { border-radius: 999px; }
+.icon-btn, .top-btn { transition: transform .25s var(--bounce), background .2s, color .2s; }
+.icon-btn:hover:not(:disabled), .top-btn:hover { transform: rotate(-12deg) scale(1.06); }
+.top-btn { background: var(--glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--line) 80%, transparent); }
+
+/* ---- Tabs: pill bar with a glowing selected pill ---- */
+.dash-tab { transition: transform .25s var(--bounce), background .2s, color .2s, box-shadow .25s; background: var(--glass); }
+.dash-tab:hover { transform: translateY(-1px); }
+.dash-tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent);
+  box-shadow: 0 8px 18px -10px var(--accent), 0 0 0 4px color-mix(in srgb, var(--glow-a) 45%, transparent); }
+
+/* ---- Fields: soft rounded with a glow on focus ---- */
+input:not([type="radio"]):not([type="file"]):not([type="checkbox"]):not([type="range"]), textarea, select {
+  border-radius: 12px; border-color: color-mix(in srgb, var(--line-strong) 75%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent); transition: border-color .2s, box-shadow .2s;
+}
+input:not([type="radio"]):not([type="file"]):not([type="checkbox"]):not([type="range"]):focus-visible, textarea:focus-visible, select:focus-visible {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--glow-a) 55%, transparent);
+}
+input[type="checkbox"], input[type="radio"] { accent-color: var(--accent); }
+
+/* ---- Pop-ups and toasts ---- */
+.chat-overlay, .lang-overlay { backdrop-filter: blur(6px) saturate(1.2); -webkit-backdrop-filter: blur(6px) saturate(1.2); }
+.stmt-paper, .lang-card { border-radius: 20px; }
+.toast { border-radius: 16px; box-shadow: var(--glow-shadow-lift); animation: glow-rise .4s var(--bounce); }
+
+/* ---- Gentle entrance when a page opens ---- */
+.app-main .wide > * { animation: glow-rise .45s var(--bounce) both; }
+.app-main .wide > *:nth-child(2) { animation-delay: .04s; }
+.app-main .wide > *:nth-child(3) { animation-delay: .08s; }
+.app-main .wide > *:nth-child(4) { animation-delay: .12s; }
+.app-main .wide > *:nth-child(n+5) { animation-delay: .16s; }
+@keyframes glow-rise { from { opacity: 0; transform: translateY(10px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-orbs::after { animation: none; }
+  .app-main .wide > *, .toast { animation: none; }
+  .btn, .icon-btn, .top-btn, .dash-tab, .nav-item, .ov-card, .ov-kpi, .post, .pf-card, .set-card, .bank-card { transition: none; }
+}
+@media print { .bg-orbs, .auth-glow, .pf-hero-glow { display: none !important; } }
