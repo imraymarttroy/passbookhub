@@ -2121,7 +2121,8 @@
   /* Community and Blog: locked until there is content for them. */
   const LOCKED_NAV = {
     Community: '<circle cx="7.5" cy="7" r="2.5"/><circle cx="13.5" cy="8" r="2"/><path d="M3 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12.5 12.2c1.9-.2 3.6.9 4.2 3.3"/>',
-    Blog: '<path d="M5 3.5h7l3 3v10H5z"/><path d="M12 3.5v3h3M7.5 10h5M7.5 13h3.5"/>'
+    Blog: '<path d="M5 3.5h7l3 3v10H5z"/><path d="M12 3.5v3h3M7.5 10h5M7.5 13h3.5"/>',
+    Games: '<path d="M6.5 6.5h7a4 4 0 0 1 4 4v1a3 3 0 0 1-5.3 1.9l-.7-.9h-3l-.7.9A3 3 0 0 1 2.5 11.5v-1a4 4 0 0 1 4-4z"/><path d="M6.5 9v2.5M5.25 10.25h2.5M13 9.5h.01M14.5 11h.01"/>'
   };
   function lockedItem(label) {
     const btn = h('button', {
@@ -2218,6 +2219,7 @@
           lockedItem('Community'),
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
+          lockedItem('Games'),
           h('li', { class: 'nav-signout-li' }, signOutButton()))),
       h('div', { class: 'sidebar-foot' }, onlineBadge(), signOutIcon(), versionButton(' side-version')));
     drawBadges();
