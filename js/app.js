@@ -3162,22 +3162,8 @@
     const work = sortedWork(person.work);
     const edu = person.education || [];
     const circleStat = h('span', { class: 'pf-stat-value num' }, '–');
-    const circleList = h('div', { class: 'pf-circle-list' }, h('p', { class: 'small muted' }, 'Loading…'));
     if (opts.mine) {
-      SOC.circleMembers(person.id).then(function (people) {
-        circleStat.textContent = String(people.length);
-        if (!people.length) {
-          circleList.replaceChildren(h('p', { class: 'small muted' }, 'No one yet. ', h('a', { href: '#circle' }, 'Find people'), '.'));
-          return;
-        }
-        circleList.replaceChildren(h('ul', { class: 'pf-circle-people' }, people.slice(0, 8).map(function (p) {
-          const slot = h('span', { class: 'note-slot' });
-          SOC.loadNote(p.id).then(function (note) {
-            if (note) slot.replaceChildren(h('span', { class: 'note-bubble' + (note.gif ? ' has-gif' : ''), title: (note.text || 'GIF') + ' \u00b7 ' + timeAgo(note.at) }, noteContent(note)));
-          }).catch(function () {});
-          return h('li', null, h('a', { href: '#u/' + p.username, title: p.name }, slot, avatarWithStatus(p, 2.5), h('span', { class: 'small' }, p.name.split(' ')[0])));
-        })), people.length > 8 ? h('a', { class: 'small', href: '#circle' }, 'See all ' + people.length) : '');
-      }).catch(function () { circleList.replaceChildren(h('p', { class: 'small muted' }, 'We could not load your circle.')); });
+      SOC.circleMembers(person.id).then(function (people) { circleStat.textContent = String(people.length); }).catch(function () {});
     }
 
     function stat(iconName, label, value, sub, tool) {
@@ -3282,19 +3268,8 @@
           w.end ? null : h('span', { class: 'pf-now' }, 'Now'));
       })) : emptyNote(opts.mine ? 'Add your current work or past experience.' : first + ' hasn’t added work experience.'));
 
-    if (!opts.mine) {
-      return h('div', { class: 'pf-page single' }, h('div', { class: 'pf-main' }, hero, stats, eduCard, workCard));
-    }
-    return h('div', { class: 'pf-page' },
-      h('div', { class: 'pf-main' }, hero, stats, eduCard, workCard),
-      h('div', { class: 'pf-side' },
-        h('section', { class: 'pf-card pf-list-card' },
-          h('div', { class: 'pf-card-head' }, h('h2', null, 'Your circle'),
-            h('div', { class: 'pf-card-links' },
-              h('a', { class: 'small', href: '#circle' }, 'Find people'),
-              h('a', { class: 'small', href: '#circle' }, 'Manage'))),
-          circleList),
-        quoteSlides()));
+    /* One column, same width as the Overview. Circle and money quotes will live in Community. */
+    return h('div', { class: 'pf-page single pf-full' }, h('div', { class: 'pf-main' }, hero, stats, eduCard, workCard));
   }
 
   /** Crops to a wide 3:1 banner and keeps it under the size limit. */

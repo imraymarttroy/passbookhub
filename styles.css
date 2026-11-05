@@ -3570,3 +3570,4 @@ body.auth-body .narrow, #app > .narrow {
 .pf-page .note-bubble { background: transparent !important; border: 1px solid var(--line-strong) !important; color: var(--ink) !important; box-shadow: none !important; border-radius: 10px; }
 .pf-page .note-bubble::before, .pf-page .note-bubble::after { display: none !important; }
 .pf-page .note-bubble:hover { background: var(--wash) !important; }
+.pf-page.single.pf-full { max-width: none; margin-inline: 0; }
