@@ -824,7 +824,7 @@
     }
     const otpCard = h('div', { class: 'su-otp' },
       h('div', { class: 'su-otp-head' },
-        h('span', { class: 'su-otp-icon', 'aria-hidden': 'true' }, h('span', { class: 'su-otp-digits' }, '••• •••')),
+        h('span', { class: 'su-otp-icon', 'aria-hidden': 'true' }, icon('lock')),
         h('label', { for: 'f-mfa', class: 'su-otp-text' }, h('strong', null, 'Two-step verification (OTP)'), h('span', { class: 'small muted' }, 'Recommended')),
         h('span', { class: 'su-switch' }, otpSwitch, h('span', { class: 'su-switch-ui', 'aria-hidden': 'true' }))),
       otpNote);
