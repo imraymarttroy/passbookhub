@@ -7,15 +7,26 @@
 window.WHATS_NEW = (function () {
   'use strict';
 
-  // Bump this when the tour changes: people who ticked "Don't show again" will see it once more.
-  const FEATURES_VERSION = '2026-11b';
+  /*
+   * App version, shown in the top bar beside the AI button. MAJOR.MINOR.PATCH:
+   *   MAJOR: a redesign or a big change in how the app works (2.0.0)
+   *   MINOR: a new feature (2.1.0)
+   *   PATCH: fixes and small polish (2.1.1)
+   * Bump it with every release and update CHANGES below. A new version shows the tour once more,
+   * even for people who ticked "Don't show this again".
+   */
+  const APP_VERSION = '2.0.0';
+  const FEATURES_VERSION = APP_VERSION;
 
   const TEXT = {
     en: {
       eyebrow: "What's in PassbookHub", close: 'Close tour', back: 'Back', next: 'Next', done: "Let's go",
       skip: 'Skip', hide: "Don't show this again", of: 'of', goTo: 'Go to slide', tryIt: 'Try it',
       soonTitle: 'And there is more coming', soonBody: 'Here is what we are building next for you and your circle.',
-      soon: ['Bill reminders', 'Expense splitter', 'Shared savings goals', 'Wishlist', 'Financial calendar'],
+      soon: ['Savings tracker', 'Wallet', 'Savings', 'Credit', 'Loan', '50/30/20 budget', 'Bill reminders', 'Expense splitter'],
+      soonTag: 'Soon',
+      updateTitle: 'New in version', updateBody: 'A cleaner PassbookHub. Here is what changed in this update.',
+      changes: ['Flat, minimal design in light and dark mode', 'Feed redesigned: like, reply, repost and quote', 'For you and Following tabs in the Feed', 'Your circle now lives on your profile', 'Dashboard starts with the Overview'],
       budgetTitle: 'Your money, split smart', budgetBody: 'Drag to set your monthly income. PassbookHub splits it 50/30/20 for you.',
       income: 'Monthly income', needs: 'Needs', wants: 'Wants', savings: 'Savings',
       trackTitle: 'Every peso, tracked', trackBody: 'Log a spend and watch your category limit. We warn you before you go over.',
@@ -32,7 +43,10 @@ window.WHATS_NEW = (function () {
       eyebrow: 'Mga feature ng PassbookHub', close: 'Isara ang tour', back: 'Bumalik', next: 'Susunod', done: 'Tara na',
       skip: 'Laktawan', hide: 'Huwag nang ipakita ulit', of: 'sa', goTo: 'Pumunta sa slide', tryIt: 'Subukan',
       soonTitle: 'May paparating pa', soonBody: 'Ito ang susunod naming gagawin para sa iyo at sa circle mo.',
-      soon: ['Paalala sa bayarin', 'Hatian ng gastos', 'Shared na savings goals', 'Wishlist', 'Financial calendar'],
+      soon: ['Savings tracker', 'Wallet', 'Ipon', 'Credit', 'Utang', '50/30/20 budget', 'Paalala sa bayarin', 'Hatian ng gastos'],
+      soonTag: 'Malapit na',
+      updateTitle: 'Bago sa version', updateBody: 'Mas malinis na PassbookHub. Ito ang mga nagbago sa update na ito.',
+      changes: ['Flat at minimal na design, light at dark mode', 'Bagong Feed: like, reply, repost at quote', 'May For you at Following sa Feed', 'Nasa profile mo na ang circle mo', 'Overview muna ang Dashboard'],
       budgetTitle: 'Matalinong hatian ng pera', budgetBody: 'I-drag para itakda ang buwanang kita. Hahatiin ito ng PassbookHub sa 50/30/20.',
       income: 'Buwanang kita', needs: 'Needs', wants: 'Wants', savings: 'Ipon',
       trackTitle: 'Bawat piso, bantay', trackBody: 'Magtala ng gastos at bantayan ang limit. Babalaan ka namin bago ka lumampas.',
@@ -258,11 +272,17 @@ window.WHATS_NEW = (function () {
       t.soon.map(function (s, i) { return el('span', { class: 'wn-soon-chip', style: '--i:' + i }, icon('spark'), s); })) };
   }
 
+  function demoUpdate(t) {
+    return { node: el('div', { class: 'wn-demo wn-update' },
+      el('ul', { class: 'wn-changes' }, t.changes.map(function (c) { return el('li', {}, icon('check'), el('span', {}, c)); }))) };
+  }
+
   const SLIDES = [
-    { icon: 'budget', title: 'budgetTitle', body: 'budgetBody', demo: demoBudget, go: '#dashboard' },
-    { icon: 'track', title: 'trackTitle', body: 'trackBody', demo: demoTrack, go: '#dashboard' },
-    { icon: 'goal', title: 'goalTitle', body: 'goalBody', demo: demoGoal, go: '#dashboard' },
-    { icon: 'ai', title: 'aiTitle', body: 'aiBody', demo: demoAI, go: '#circle' },
+    { icon: 'spark', title: 'updateTitle', body: 'updateBody', demo: demoUpdate, version: true },
+    { icon: 'budget', title: 'budgetTitle', body: 'budgetBody', demo: demoBudget, soon: true },
+    { icon: 'track', title: 'trackTitle', body: 'trackBody', demo: demoTrack, soon: true },
+    { icon: 'goal', title: 'goalTitle', body: 'goalBody', demo: demoGoal, soon: true },
+    { icon: 'ai', title: 'aiTitle', body: 'aiBody', demo: demoAI, go: '#feed' },
     { icon: 'lock', title: 'secTitle', body: 'secBody', demo: demoSecurity, go: '#settings' },
     { icon: 'spark', title: 'soonTitle', body: 'soonBody', demo: demoSoon }
   ];
@@ -305,7 +325,8 @@ window.WHATS_NEW = (function () {
       const slide = el('section', { class: 'wn-slide ' + dir, 'aria-roledescription': 'slide', 'aria-label': (i + 1) + ' ' + t.of + ' ' + SLIDES.length },
         el('div', { class: 'wn-head' },
           icon(s.icon, 'wn-badge'),
-          el('div', {}, el('h2', { id: 'wn-title' }, el('span', { class: 'wn-grad' }, t[s.title])), el('p', { class: 'wn-body' }, t[s.body]))),
+          el('div', {}, el('h2', { id: 'wn-title' }, el('span', { class: 'wn-grad' }, t[s.title] + (s.version ? ' ' + APP_VERSION : '')),
+            s.soon ? el('span', { class: 'wn-soon-tag' }, t.soonTag) : null), el('p', { class: 'wn-body' }, t[s.body]))),
         current.node,
         tryBtn);
       stage.replaceChildren(slide);
@@ -367,8 +388,15 @@ window.WHATS_NEW = (function () {
         el('div', { class: 'wn-navs' }, backBtn, nextBtn)));
 
     const overlay = el('div', { class: 'wn-overlay', 'data-no-translate': '', onclick: function (e) { if (e.target === overlay) close(); } }, card);
+    overlay.closeTour = function () {
+      if (current && current.stop) current.stop();
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
     document.body.appendChild(overlay);
     document.addEventListener('keydown', onKey);
+    markSeen(uid);
+    document.querySelectorAll('.version-btn').forEach(function (b) { b.classList.remove('is-new'); });
     go(0);
     nextBtn.focus();
   }
@@ -379,5 +407,14 @@ window.WHATS_NEW = (function () {
     } catch (e) { /* storage may be off */ }
   }
 
-  return { showOnLogin: showFeaturesOnLogin, show: showFeatures, resetSession: resetSession, version: FEATURES_VERSION };
+  /** Closes the tour right away (for example when you sign out). */
+  function closeNow() {
+    document.querySelectorAll('.wn-overlay').forEach(function (o) { if (o.closeTour) o.closeTour(); else o.remove(); });
+  }
+
+  /** True until this person opens the tour for the current version (lights the dot on the version button). */
+  function isNew(uid) { return get('localStorage', 'pbh-version-seen:' + (uid || 'anon')) !== APP_VERSION; }
+  function markSeen(uid) { set('localStorage', 'pbh-version-seen:' + (uid || 'anon'), APP_VERSION); }
+
+  return { showOnLogin: showFeaturesOnLogin, show: showFeatures, close: closeNow, resetSession: resetSession, version: APP_VERSION, isNew: isNew, markSeen: markSeen };
 })();

@@ -304,6 +304,8 @@
       setTimeout(function () { if (username) dock.open(username); else dock.openPicker(); }, 0);
     }
     if (!BT.currentUser() && window.WHATS_NEW) WHATS_NEW.resetSession();
+    /* The features pop-up belongs to the signed-in app only: never over sign in, sign up or setup. */
+    if (SHELL_VIEWS.indexOf(view) === -1 && window.WHATS_NEW && WHATS_NEW.close) WHATS_NEW.close();
     if (!BT.currentUser() && socialFor) { socialFor = null; SOC.stopWatching(); SOC.stopWatchingChats(); SOC.stopWatchingTrust(); SOC.stopPresence(); onlineCache = null; }
     if (state.cleanup) { state.cleanup(); state.cleanup = null; }
     state.onTrustChange = null;
@@ -326,7 +328,9 @@
     if (SHELL_VIEWS.indexOf(view) !== -1 && BT.currentUser() && window.WHATS_NEW) {
       /* Features pop-up: once per login, after the page has painted. */
       const uid = BT.currentUser().id;
-      setTimeout(function () { WHATS_NEW.showOnLogin(uid); }, 400);
+      setTimeout(function () {
+        if (BT.currentUser() && BT.currentUser().id === uid && SHELL_VIEWS.indexOf(state.view) !== -1) WHATS_NEW.showOnLogin(uid);
+      }, 400);
     }
     if (changed) {
       window.scrollTo(0, 0);
@@ -574,7 +578,8 @@
           h('span', null, '\u00a9 ' + new Date().getFullYear() + ' PassbookHub'),
           h('span', null, 'Half for needs, some for wants, the rest for later.'),
           h('a', { class: 'auth-legal', href: 'legal.html', target: '_blank', rel: 'noopener' }, 'Terms & Privacy'),
-          languageButton())));
+          languageButton(),
+          themeTextButton())));
   }
 
   /* ---------- Language picker (sign in / sign up footer) ---------- */
@@ -1697,6 +1702,37 @@
     return button;
   }
 
+  /** Footer text toggle: "Dark mode" / "Light mode", next to Language. */
+  function themeTextButton() {
+    const button = h('button', { type: 'button', class: 'lang-btn theme-text-btn theme-btn' });
+    function draw() {
+      const dark = currentTheme() === 'dark';
+      button.textContent = dark ? 'Light mode' : 'Dark mode';
+      button.setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+    }
+    button.addEventListener('click', function () {
+      const next = currentTheme() === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('pbh.theme', next); } catch (e) { /* storage off */ }
+      document.querySelectorAll('.theme-btn').forEach(function (b) { if (b.redraw) b.redraw(); });
+    });
+    button.redraw = draw;
+    draw();
+    return button;
+  }
+
+  /** "v2.0.0" beside the AI button: opens what's new in this version. The dot glows until you have seen it. */
+  function versionButton() {
+    const uid = BT.currentUser() ? BT.currentUser().id : null;
+    const version = window.WHATS_NEW ? WHATS_NEW.version : '';
+    const fresh = window.WHATS_NEW && WHATS_NEW.isNew ? WHATS_NEW.isNew(uid) : false;
+    return h('button', {
+      type: 'button', class: 'version-btn' + (fresh ? ' is-new' : ''), title: 'What\u2019s new in v' + version,
+      'aria-label': 'What\u2019s new in version ' + version, 'data-no-translate': '',
+      onclick: function () { if (window.WHATS_NEW) WHATS_NEW.show(uid); }
+    }, h('span', { class: 'version-dot', 'aria-hidden': 'true' }), 'v' + version);
+  }
+
   /* "3 online": people in your circle with the app open right now. Hidden when the sidebar is collapsed. */
   let onlineCache = null;
   function onlineBadge() {
@@ -1840,6 +1876,7 @@
     });
     aiBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">' + AI_SPARK + '</svg><span class="top-label">Ask PassbookHub AI</span>';
     const top = h('div', { class: 'top-actions' },
+      versionButton(),
       aiBtn,
       themeButton(),
       topLink('notifications', '#alerts', 'Alerts'),
@@ -1864,13 +1901,12 @@
       h('div', { class: 'sidebar-top' },
         h('a', { class: 'brand sidebar-brand', href: '#dashboard', 'aria-label': 'PassbookHub' }, logoMark('sidebar-mark'), h('span', { class: 'sidebar-word' }, 'PassbookHub')),
         collapseBtn),
-      statusMenu(user, current === 'profile'),
+      statusMenu(user, current === 'profile' || current === 'circle'),
       h('nav', { 'aria-label': 'Main' },
         h('ul', { class: 'nav-list' },
           item('dashboard', '#dashboard', 'Dashboard',
             h('span', { class: 'nav-pin', title: 'Private: only you can see your dashboard' }, icon('pin'), h('span', { class: 'vh' }, '(private)'))),
           item('feed', '#feed', 'Feed'),
-          item('circle', '#circle', 'Circle'),
           h('li', null, h('button', {
             type: 'button',
             class: 'nav-item',
@@ -2232,33 +2268,451 @@
     return add;
   }
 
-  /* ---------- Feed ---------- */
+  /* ---------- Feed (Threads style): For you / Following, likes, replies, reposts, quotes ---------- */
+
+  const TH_ICONS = {
+    heart: '<path d="M10 16.5s-6.5-3.9-6.5-8.6A3.6 3.6 0 0 1 10 5.6a3.6 3.6 0 0 1 6.5 2.3c0 4.7-6.5 8.6-6.5 8.6z"/>',
+    reply: '<path d="M16.8 13.4A7 7 0 1 0 14 16l3 .9z"/>',
+    repost: '<path d="M4.5 9V7.5A2.5 2.5 0 0 1 7 5h9M13.5 2.5 16 5l-2.5 2.5M15.5 11v1.5A2.5 2.5 0 0 1 13 15H4M6.5 17.5 4 15l2.5-2.5"/>',
+    share: '<path d="m17 3-7.6 7.6M17 3l-4.8 14-2.8-6.4L3 7.8z"/>',
+    more: '<circle cx="4.5" cy="10" r="1.1" fill="currentColor"/><circle cx="10" cy="10" r="1.1" fill="currentColor"/><circle cx="15.5" cy="10" r="1.1" fill="currentColor"/>',
+    quote: '<path d="M4 8.5h4.5V13H4zM4 8.5C4 6 5.2 4.8 7 4.5M11.5 8.5H16V13h-4.5zM11.5 8.5c0-2.5 1.2-3.7 3-4"/>'
+  };
+  function thIcon(name) {
+    const holder = document.createElement('span');
+    holder.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + TH_ICONS[name] + '</svg>';
+    return holder.firstChild;
+  }
+
+  /** Post text with @mentions and web links made clickable. Built from text nodes only. */
+  function richText(text, className) {
+    const p = h('p', { class: className });
+    const re = /(@[A-Za-z0-9_]{3,20})|(https?:\/\/[^\s<>"]+)/g;
+    let last = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) p.appendChild(document.createTextNode(text.slice(last, m.index)));
+      if (m[1]) p.appendChild(h('a', { href: '#u/' + m[1].slice(1), class: 'th-mention' }, m[1]));
+      else p.appendChild(h('a', { href: m[2], target: '_blank', rel: 'noopener noreferrer nofollow', class: 'th-link' }, m[2]));
+      last = re.lastIndex;
+    }
+    if (last < text.length) p.appendChild(document.createTextNode(text.slice(last)));
+    return p;
+  }
+
+  function personHref(person) {
+    return person.id === BT.currentUser().id ? '#profile' : '#u/' + person.username;
+  }
+
+  function profileLink(person) {
+    return location.origin + location.pathname + '#u/' + person.username;
+  }
+
+  /** A small menu that opens under a button and closes on Escape or a click outside. */
+  function popMenu(anchor, items) {
+    document.querySelectorAll('.th-menu').forEach(function (m) { m.remove(); });
+    const menu = h('div', { class: 'th-menu', role: 'menu' }, items.filter(Boolean).map(function (it) {
+      if (it === '-') return h('hr', { class: 'th-menu-sep' });
+      return h('button', {
+        type: 'button', role: it.checked === undefined ? 'menuitem' : 'menuitemradio',
+        'aria-checked': it.checked === undefined ? null : String(it.checked),
+        class: 'th-menu-item' + (it.danger ? ' danger' : ''), disabled: it.disabled || null,
+        onclick: function () { close(); it.run(); }
+      }, it.icon || null, h('span', null, it.label), it.checked ? h('span', { class: 'th-check', 'aria-hidden': 'true' }, '✓') : null);
+    }));
+    function close() {
+      menu.remove();
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('hashchange', close);
+    }
+    function outside(e) { if (!menu.contains(e.target) && !anchor.contains(e.target)) close(); }
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); anchor.focus(); } }
+    const r = anchor.getBoundingClientRect();
+    document.body.appendChild(menu);
+    const top = r.bottom + 4 + menu.offsetHeight > window.innerHeight ? r.top - menu.offsetHeight - 4 : r.bottom + 4;
+    menu.style.top = Math.max(8, top) + 'px';
+    menu.style.left = Math.max(8, Math.min(r.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('hashchange', close);
+    const first = menu.querySelector('button:not([disabled])');
+    if (first) first.focus();
+  }
+
+  /** The quoted post inside a quote, or a note when the original is gone. */
+  function quotedCard(ref) {
+    const box = h('div', { class: 'th-quoted' }, h('p', { class: 'small muted' }, 'Loading…'));
+    Promise.all([SOC.getProfile(ref.uid).catch(function () { return null; }), SOC.getPost(ref.uid, ref.id)]).then(function (r) {
+      const person = r[0], post = r[1];
+      if (!person || !post) { box.replaceChildren(h('p', { class: 'small muted' }, 'This post is no longer available.')); return; }
+      box.replaceChildren(
+        h('div', { class: 'th-quoted-head' },
+          avatar(person, person.avatar, 1.25),
+          h('a', { class: 'th-name', href: personHref(person) }, person.name),
+          h('span', { class: 'th-time' }, timeAgo(post.createdAt))),
+        post.text ? richText(post.text, 'th-text') : null);
+    });
+    return box;
+  }
+
+  /** Write or quote: a small pop-up with the post being quoted underneath. */
+  function quoteDialog(person, post, onDone) {
+    const previous = document.activeElement;
+    const text = h('textarea', { rows: 3, maxlength: SOC.POST_MAX, placeholder: 'Add your thoughts…', 'aria-label': 'Your quote' });
+    const send = h('button', { type: 'button', class: 'btn primary small', disabled: true }, 'Post');
+    const cancel = h('button', { type: 'button', class: 'btn small', onclick: function () { done(); } }, 'Cancel');
+    text.addEventListener('input', function () { send.disabled = !text.value.trim(); });
+    const me = BT.currentUser();
+    const card = h('div', { class: 'ask-card th-quote-card', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Quote post' },
+      h('div', { class: 'th-compose-row' },
+        avatar(me, me.avatar, 2.25),
+        h('div', { class: 'th-compose-main' },
+          h('strong', { class: 'th-name' }, me.name),
+          text,
+          h('div', { class: 'th-quoted' },
+            h('div', { class: 'th-quoted-head' }, avatar(person, person.avatar, 1.25), h('span', { class: 'th-name' }, person.name), h('span', { class: 'th-time' }, timeAgo(post.createdAt))),
+            post.text ? richText(post.text, 'th-text') : null))),
+      h('div', { class: 'ask-actions' }, cancel, send));
+    const overlay = h('div', { class: 'chat-overlay ask' }, card);
+    send.addEventListener('click', async function () {
+      send.disabled = true;
+      try {
+        await SOC.repost(person.id, post.id, text.value);
+        toast('Quote posted.');
+        done();
+        if (onDone) onDone();
+      } catch (error) { send.disabled = false; toast(error.message); }
+    });
+    function onKey(e) { if (e.key === 'Escape') done(); }
+    function done() {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (previous && previous.isConnected) previous.focus();
+    }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) done(); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(overlay);
+    text.focus();
+  }
+
+  /** One reply under a post. */
+  function replyRow(owner, post, reply, onRemoved) {
+    const me = BT.currentUser();
+    const canDelete = reply.author === me.id || owner.id === me.id;
+    const del = canDelete ? h('button', { type: 'button', class: 'th-mini-btn', 'aria-label': 'Delete reply', title: 'Delete reply' }, icon('remove')) : null;
+    if (del) del.addEventListener('click', async function () {
+      const ok = await ask({ title: 'Delete this reply?', yes: 'Delete', no: 'Cancel' });
+      if (!ok) return;
+      try { await SOC.deleteReply(owner.id, post.id, reply.id); row.remove(); onRemoved(); }
+      catch (error) { toast(error.message); }
+    });
+    const person = reply.author === me.id ? Object.assign({}, reply.person, { id: me.id, name: me.name, username: me.username, avatar: me.avatar }) : reply.person;
+    const row = h('li', { class: 'th-reply' },
+      h('a', { class: 'th-rail-pic', href: personHref(person), 'aria-label': person.name }, avatar(person, person.avatar, 1.75)),
+      h('div', { class: 'th-body' },
+        h('div', { class: 'th-head' },
+          h('a', { class: 'th-name', href: personHref(person) }, person.name),
+          h('span', { class: 'th-time' }, timeAgo(reply.createdAt)),
+          del),
+        richText(reply.text, 'th-text')));
+    return row;
+  }
+
+  /**
+   * A post in the Threads layout. item = { person, post, mine }.
+   * Reposts show "Name reposted" above the original post; quotes embed the original.
+   */
+  function threadPost(item, onChange) {
+    const post = item.post;
+    if (post.repostOf && !post.text) {
+      const box = h('div', { class: 'th-repost-wrap' },
+        h('p', { class: 'th-reposted' }, thIcon('repost'), h('a', { href: personHref(item.person) }, item.mine ? 'You' : item.person.name), ' reposted'),
+        h('p', { class: 'small muted th-loading' }, 'Loading…'));
+      Promise.all([SOC.getProfile(post.repostOf.uid).catch(function () { return null; }), SOC.getPost(post.repostOf.uid, post.repostOf.id)]).then(function (r) {
+        const loading = box.querySelector('.th-loading');
+        if (!r[0] || !r[1]) {
+          loading.textContent = 'This post is no longer available.';
+          if (item.mine) {
+            loading.append(' ', h('button', { type: 'button', class: 'link small', onclick: async function () {
+              try { await SOC.deletePost(post.id); onChange(); } catch (error) { toast(error.message); }
+            } }, 'Remove'));
+          }
+          return;
+        }
+        loading.replaceWith(threadPost({ person: r[0], post: r[1], mine: r[0].id === BT.currentUser().id }, onChange));
+      });
+      return box;
+    }
+
+    const me = BT.currentUser();
+    const person = item.person;
+    const isPublic = post.visibility === 'public';
+    const stats = { likes: 0, replies: 0, reposts: 0, liked: false, repostId: null };
+
+    const likeCount = h('span', { class: 'th-count num' });
+    const replyCount = h('span', { class: 'th-count num' });
+    const repostCount = h('span', { class: 'th-count num' });
+    const likeBtn = h('button', { type: 'button', class: 'th-act th-like', 'aria-pressed': 'false', 'aria-label': 'Like' }, thIcon('heart'), likeCount);
+    const replyBtn = h('button', { type: 'button', class: 'th-act', 'aria-label': 'Reply', 'aria-expanded': 'false' }, thIcon('reply'), replyCount);
+    const repostBtn = h('button', {
+      type: 'button', class: 'th-act', 'aria-label': 'Repost', 'aria-haspopup': 'menu',
+      disabled: !isPublic || null, title: isPublic ? 'Repost' : 'Only public posts can be reposted'
+    }, thIcon('repost'), repostCount);
+    const shareBtn = h('button', { type: 'button', class: 'th-act', 'aria-label': 'Share', title: 'Share' }, thIcon('share'));
+
+    function drawStats() {
+      likeCount.textContent = stats.likes ? String(stats.likes) : '';
+      replyCount.textContent = stats.replies ? String(stats.replies) : '';
+      repostCount.textContent = stats.reposts ? String(stats.reposts) : '';
+      likeBtn.setAttribute('aria-pressed', stats.liked ? 'true' : 'false');
+      likeBtn.setAttribute('aria-label', stats.liked ? 'Unlike' : 'Like');
+      repostBtn.classList.toggle('on', !!stats.repostId);
+    }
+
+    likeBtn.addEventListener('click', async function () {
+      const on = !stats.liked;
+      stats.liked = on; stats.likes += on ? 1 : -1; drawStats();
+      likeBtn.classList.remove('pop'); void likeBtn.offsetWidth; if (on) likeBtn.classList.add('pop');
+      try { await SOC.setLike(person.id, post.id, on); }
+      catch (error) { stats.liked = !on; stats.likes += on ? -1 : 1; drawStats(); toast(error.message); }
+    });
+
+    repostBtn.addEventListener('click', function () {
+      popMenu(repostBtn, [
+        stats.repostId !== null
+          ? { label: 'Remove repost', icon: thIcon('repost'), danger: true, run: async function () {
+              try { await SOC.undoRepost(person.id, post.id, stats.repostId); stats.repostId = null; stats.reposts = Math.max(0, stats.reposts - 1); drawStats(); toast('Repost removed.'); onChange(); }
+              catch (error) { toast(error.message); }
+            } }
+          : { label: 'Repost', icon: thIcon('repost'), run: async function () {
+              try { const p = await SOC.repost(person.id, post.id, ''); stats.repostId = p.id; stats.reposts += 1; drawStats(); toast('Reposted.'); onChange(); }
+              catch (error) { toast(error.message); }
+            } },
+        { label: 'Quote', icon: thIcon('quote'), run: function () { quoteDialog(person, post, onChange); } }
+      ]);
+    });
+
+    shareBtn.addEventListener('click', function () {
+      const url = profileLink(person);
+      const text = post.text ? post.text.slice(0, 120) : person.name + ' on PassbookHub';
+      if (navigator.share) { navigator.share({ title: 'PassbookHub', text: text, url: url }).catch(function () {}); return; }
+      popMenu(shareBtn, [
+        { label: 'Copy link', run: function () {
+          (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function () { toast('Link copied.'); }, function () { toast(url); });
+        } },
+        { label: 'Copy text', disabled: !post.text, run: function () {
+          (navigator.clipboard ? navigator.clipboard.writeText(post.text) : Promise.reject()).then(function () { toast('Text copied.'); }, function () { toast('Could not copy.'); });
+        } }
+      ]);
+    });
+
+    /* "..." menu: who can see it and delete for your own posts; profile and link for others. */
+    const moreBtn = h('button', { type: 'button', class: 'th-mini-btn th-more', 'aria-label': 'More', 'aria-haspopup': 'menu', title: 'More' }, thIcon('more'));
+    const visLabel = isPublic ? null : h('span', { class: 'th-vis', title: SOC.VISIBILITY[post.visibility].hint }, visIcon(post.visibility));
+    moreBtn.addEventListener('click', function () {
+      if (item.mine) {
+        const vis = post.repostOf ? [] : Object.keys(SOC.VISIBILITY).map(function (key) {
+          return { label: SOC.VISIBILITY[key].label, icon: visIcon(key), checked: post.visibility === key, run: async function () {
+            if (post.visibility === key) return;
+            try { await SOC.setPostVisibility(post.id, key); toast('Now visible to: ' + SOC.VISIBILITY[key].label + '.'); onChange(); }
+            catch (error) { toast(error.message); }
+          } };
+        });
+        popMenu(moreBtn, vis.concat(vis.length ? ['-'] : [], [{ label: 'Delete', icon: icon('remove'), danger: true, run: async function () {
+          const ok = await ask({ title: 'Delete this post?', body: 'Replies, likes and reposts go with it. You can’t undo this.', yes: 'Delete', no: 'Cancel' });
+          if (!ok) return;
+          try { await SOC.deletePost(post.id); toast('Post deleted.'); onChange(); } catch (error) { toast(error.message); }
+        } }]));
+      } else {
+        popMenu(moreBtn, [
+          { label: 'View profile', icon: icon('profile'), run: function () { location.hash = personHref(person); } },
+          { label: 'Copy link', icon: thIcon('share'), run: function () {
+            (navigator.clipboard ? navigator.clipboard.writeText(profileLink(person)) : Promise.reject()).then(function () { toast('Link copied.'); }, function () { toast(profileLink(person)); });
+          } }
+        ]);
+      }
+    });
+
+    /* Replies open under the post, joined by a thin line like Threads. */
+    const repliesBox = h('div', { class: 'th-replies', hidden: true });
+    let repliesLoaded = false;
+    const replyInput = h('input', { type: 'text', maxlength: SOC.REPLY_MAX, placeholder: 'Reply to ' + person.name.split(' ')[0] + '…', 'aria-label': 'Write a reply', autocomplete: 'off' });
+    const replySend = h('button', { type: 'submit', class: 'btn primary small', disabled: true }, 'Reply');
+    replyInput.addEventListener('input', function () { replySend.disabled = !replyInput.value.trim(); });
+    const replyList = h('ul', { class: 'th-reply-list' });
+    const replyForm = h('form', {
+      class: 'th-reply-form', novalidate: true,
+      onsubmit: async function (e) {
+        e.preventDefault();
+        const problem = SOC.validateReply(replyInput.value);
+        if (problem) return toast(problem);
+        replySend.disabled = true;
+        try {
+          const reply = await SOC.addReply(person.id, post.id, replyInput.value);
+          replyInput.value = '';
+          replyList.appendChild(replyRow(person, post, reply, function () { stats.replies = Math.max(0, stats.replies - 1); drawStats(); }));
+          stats.replies += 1; drawStats();
+        } catch (error) { toast(error.message); replySend.disabled = false; }
+      }
+    }, avatar(me, me.avatar, 1.75), replyInput, replySend);
+    repliesBox.append(replyList, replyForm);
+
+    async function loadReplies() {
+      replyList.replaceChildren(h('li', { class: 'small muted th-reply-note' }, 'Loading replies…'));
+      try {
+        const replies = await SOC.listReplies(person.id, post.id);
+        replyList.replaceChildren.apply(replyList, replies.map(function (r) {
+          return replyRow(person, post, r, function () { stats.replies = Math.max(0, stats.replies - 1); drawStats(); });
+        }));
+        repliesLoaded = true;
+      } catch (error) {
+        replyList.replaceChildren(h('li', { class: 'small muted th-reply-note' }, error.message || 'We could not load replies.'));
+      }
+    }
+    replyBtn.addEventListener('click', function () {
+      const open = repliesBox.hidden;
+      repliesBox.hidden = !open;
+      article.classList.toggle('open', open);
+      replyBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) { if (!repliesLoaded) loadReplies(); replyInput.focus(); }
+    });
+
+    const article = h('article', { class: 'th-post' },
+      h('a', { class: 'th-rail-pic', href: personHref(person), 'aria-label': person.name }, avatar(person, person.avatar, 2.25)),
+      h('div', { class: 'th-body' },
+        h('div', { class: 'th-head' },
+          h('a', { class: 'th-name', href: personHref(person) }, person.name),
+          h('span', { class: 'th-handle' }, '@' + person.username),
+          h('span', { class: 'th-time', title: new Date(post.createdAt).toLocaleString(I18N.locale) }, timeAgo(post.createdAt)),
+          visLabel,
+          moreBtn),
+        post.text ? richText(post.text, 'th-text') : null,
+        post.repostOf ? quotedCard(post.repostOf) : null,
+        h('div', { class: 'th-actions' }, likeBtn, replyBtn, repostBtn, shareBtn),
+        repliesBox));
+
+    /* Counts load once the post scrolls into view. */
+    function loadStats() {
+      SOC.postStats(person.id, post.id).then(function (s) { Object.assign(stats, s); drawStats(); });
+    }
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) { io.disconnect(); loadStats(); }
+      }, { rootMargin: '200px' });
+      setTimeout(function () { io.observe(article); }, 0);
+    } else loadStats();
+    drawStats();
+    return article;
+  }
+
+  /** "What's new?" box at the top of the feed. */
+  function threadComposer(user, onPosted) {
+    const text = h('textarea', { id: 'f-post', name: 'post', rows: 1, maxlength: SOC.POST_MAX, placeholder: 'What’s new?', 'aria-label': 'Start a post' });
+    const counter = h('span', { class: 'th-counter num', 'aria-live': 'polite' });
+    const select = visibilitySelect('f-visibility', state.postVisibility || 'public', 'Who can see this');
+    select.classList.add('th-vis-select');
+    select.addEventListener('change', function () { state.postVisibility = select.value; });
+    const send = h('button', { class: 'btn primary small', type: 'submit', disabled: true }, 'Post');
+    function sync() {
+      text.style.height = 'auto';
+      text.style.height = Math.min(text.scrollHeight, 320) + 'px';
+      const left = SOC.POST_MAX - text.value.length;
+      counter.textContent = left <= 60 ? String(left) : '';
+      send.disabled = !text.value.trim();
+      form.classList.toggle('active', !!text.value || document.activeElement === text);
+    }
+    text.addEventListener('input', sync);
+    text.addEventListener('focus', sync);
+    text.addEventListener('blur', function () { setTimeout(sync, 150); });
+    const form = h('form', {
+      class: 'th-composer', novalidate: true,
+      onsubmit: function (event) {
+        event.preventDefault();
+        const problem = SOC.validatePost(text.value, select.value);
+        if (problem) return showErrors(form, { _form: problem });
+        busy(form, 'Posting…', async function () {
+          await SOC.createPost(text.value, select.value);
+          text.value = '';
+          toast('Posted.');
+          onPosted();
+        }).then(sync);
+      }
+    },
+      h('a', { class: 'th-rail-pic', href: '#profile', 'aria-label': 'Your profile' }, avatar(user, user.avatar, 2.25)),
+      h('div', { class: 'th-compose-main' },
+        h('strong', { class: 'th-name' }, user.name),
+        text,
+        formError(),
+        h('div', { class: 'th-compose-bar' }, select, counter, send)));
+    setTimeout(sync, 0);
+    return form;
+  }
 
   function viewFeed() {
     const user = BT.currentUser();
-    const list = h('div', { class: 'posts' }, h('p', { class: 'muted small' }, 'Loading your feed…'));
-    async function load() {
-      try {
-        const items = await SOC.feedPosts(60);
-        if (!list.isConnected && list.parentNode) return;
-        if (!items.length) {
-          list.replaceChildren(h('p', { class: 'empty' }, 'Nothing here yet. Share something, or add people to your ', h('a', { href: '#circle' }, 'circle'), ' to see their posts.'));
-          return;
-        }
-        list.replaceChildren.apply(list, items.map(function (item) {
-          const person = item.mine ? Object.assign({}, item.person, { id: user.id, name: user.name, username: user.username, avatar: user.avatar }) : item.person;
-          return postCard(person, item.post, item.mine, load);
-        }));
-      } catch (error) {
-        list.replaceChildren(h('p', { class: 'empty' }, error.message || 'We could not load your feed.'));
-      }
+    const list = h('div', { class: 'th-list', 'aria-live': 'polite' });
+    const note = h('p', { class: 'th-note small muted', hidden: true });
+    let tab = state.feedTab === 'following' ? 'following' : 'foryou';
+    let ticket = 0;
+
+    function mineFix(item) {
+      return item.mine ? Object.assign({}, item, { person: Object.assign({}, item.person, { id: user.id, name: user.name, username: user.username, avatar: user.avatar }) }) : item;
     }
+
+    async function load() {
+      const mine = ++ticket;
+      note.hidden = true;
+      if (!list.children.length) list.replaceChildren(h('p', { class: 'th-empty small muted' }, 'Loading…'));
+      let items;
+      try {
+        const following = SOC.feedPosts(60);
+        if (tab === 'following') items = await following;
+        else {
+          const r = await Promise.all([SOC.publicPosts(40).catch(function (e) { console.warn(e); return null; }), following.catch(function () { return []; })]);
+          if (r[0] === null) { note.textContent = 'Showing posts from you and your circle. Public posts from everyone will appear here soon.'; note.hidden = false; }
+          const seen = {};
+          items = [].concat(r[0] || [], r[1]).filter(function (it) {
+            const key = it.person.id + '/' + it.post.id;
+            if (seen[key]) return false;
+            seen[key] = true;
+            return true;
+          }).sort(function (a, b) { return b.post.createdAt - a.post.createdAt; }).slice(0, 60);
+        }
+      } catch (error) {
+        if (mine === ticket) list.replaceChildren(h('p', { class: 'th-empty' }, error.message || 'We could not load your feed.'));
+        return;
+      }
+      if (mine !== ticket || (!list.isConnected && list.parentNode)) return;
+      if (!items.length) {
+        list.replaceChildren(h('div', { class: 'th-empty' },
+          h('strong', null, tab === 'following' ? 'Nothing here yet' : 'Be the first to post'),
+          h('p', { class: 'small muted' }, 'Share something, or add people to ', h('a', { href: '#circle' }, 'your circle'), ' to see their posts.')));
+        return;
+      }
+      list.replaceChildren.apply(list, items.map(function (item) { return threadPost(mineFix(item), load); }));
+    }
+
+    const tabs = [['foryou', 'For you'], ['following', 'Following']].map(function (t) {
+      return h('button', {
+        type: 'button', role: 'tab', class: 'th-tab', 'aria-selected': tab === t[0] ? 'true' : 'false',
+        onclick: function () {
+          if (tab === t[0]) { window.scrollTo({ top: 0 }); load(); return; }
+          tab = state.feedTab = t[0];
+          tabs.forEach(function (b, i) { b.setAttribute('aria-selected', ['foryou', 'following'][i] === tab ? 'true' : 'false'); });
+          list.replaceChildren();
+          load();
+        }
+      }, t[1]);
+    });
+
     load();
-    return h('div', { class: 'wide' },
-      h('h1', { style: 'margin-bottom:1.25rem' }, 'Feed'),
-      composer(user, load),
-      h('h2', { class: 'posts-title' }, 'From you and your circle'),
-      list);
+    return h('div', { class: 'wide th-page' },
+      h('h1', { class: 'vh' }, 'Feed'),
+      h('div', { class: 'th-tabs', role: 'tablist', 'aria-label': 'Feed' }, tabs),
+      h('div', { class: 'th-column' },
+        threadComposer(user, load),
+        note,
+        list));
   }
 
   /* ---------- Profile (dashboard style) ---------- */
@@ -2498,7 +2952,10 @@
       h('div', { class: 'pf-main' }, hero, stats, eduCard, workCard),
       h('div', { class: 'pf-side' },
         h('section', { class: 'pf-card pf-list-card' },
-          h('div', { class: 'pf-card-head' }, h('h2', null, 'Your circle'), h('a', { class: 'small', href: '#circle' }, 'Manage')),
+          h('div', { class: 'pf-card-head' }, h('h2', null, 'Your circle'),
+            h('div', { class: 'pf-card-links' },
+              h('a', { class: 'small', href: '#circle' }, 'Find people'),
+              h('a', { class: 'small', href: '#circle' }, 'Manage'))),
           circleList),
         quoteSlides()));
   }
@@ -2988,8 +3445,9 @@
     }).catch(function (error) { members.replaceChildren(h('p', { class: 'empty' }, error.message)); });
 
     setTimeout(function () { if (input.isConnected) input.focus(); }, 0);
-    return h('div', { class: 'wide' },
-      h('h1', null, 'Circle'),
+    return h('div', { class: 'wide circle-page' },
+      h('a', { class: 'back-link small', href: '#profile' }, icon('prev'), 'Your profile'),
+      h('h1', null, 'Your circle'),
       h('p', { class: 'muted', style: 'margin:0.25rem 0 1.25rem' }, 'Your circle is your PassbookHub friends. Posts you share with “Circle” are visible only to them, and you can message anyone in your circle.'),
       h('div', { class: 'search-box' }, h('label', { class: 'vh', for: 'f-search' }, 'Search people'), navIcon('circle'), input),
       results,
@@ -4541,21 +4999,19 @@
     });
     const overviewPanel = h('div', { id: 'panel-overview', role: 'tabpanel', 'aria-labelledby': 'tab-overview' }, overview.el);
     const budgetPanel = h('div', { class: 'budget-panel' });
+    /* For now only the Overview is open; the other sections show as "Soon". */
     const tabButtons = DASH_TABS.map(function (t) {
+      const soon = DASH_SOON.indexOf(t[0]) !== -1;
       return h('button', {
-        type: 'button', role: 'tab', class: 'dash-tab', id: 'tab-' + t[0], 'aria-controls': t[0] === 'budget' || t[0] === 'overview' ? 'panel-' + t[0] : 'panel-tracker',
-        onclick: function () { pickTab(t[0]); },
-        onkeydown: function (event) {
-          const i = DASH_TABS.findIndex(function (x) { return x[0] === t[0]; });
-          let j = null;
-          if (event.key === 'ArrowRight') j = (i + 1) % DASH_TABS.length;
-          if (event.key === 'ArrowLeft') j = (i - 1 + DASH_TABS.length) % DASH_TABS.length;
-          if (j !== null) { event.preventDefault(); pickTab(DASH_TABS[j][0]); tabButtons[j].focus(); }
-        }
-      }, t[1]);
+        type: 'button', role: 'tab', class: 'dash-tab' + (soon ? ' soon' : ''), id: 'tab-' + t[0],
+        'aria-controls': t[0] === 'budget' || t[0] === 'overview' ? 'panel-' + t[0] : 'panel-tracker',
+        'aria-disabled': soon ? 'true' : null, title: soon ? t[1] + ' is coming soon' : null,
+        onclick: function () { if (soon) toast(t[1] + ' is coming soon.'); else pickTab(t[0]); }
+      }, t[1], soon ? h('span', { class: 'soon-tag' }, 'Soon') : null);
     });
     const trackerPanel = h('div', { id: 'panel-tracker', role: 'tabpanel' }, tracker.el);
     function pickTab(name) {
+      if (DASH_SOON.indexOf(name) !== -1) { toast('That section is coming soon.'); name = 'overview'; }
       state.dashTab = name;
       tabButtons.forEach(function (b, i) {
         const on = DASH_TABS[i][0] === name;
@@ -4614,6 +5070,7 @@
 
   /* ---------- Savings tracker (bank accounts, wallets, credit cards, loans) ---------- */
 
+  const DASH_SOON = ['tracker', 'wallet', 'savings', 'credit', 'loan', 'budget'];
   const DASH_TABS = [['overview', 'Overview'], ['tracker', 'Savings tracker'], ['wallet', 'Wallet'], ['savings', 'Savings'], ['credit', 'Credit'], ['loan', 'Loan'], ['budget', '50/30/20']];
 
   function amountsHidden() { try { return localStorage.getItem('pbh.hideAmounts') === '1'; } catch (e) { return false; } }

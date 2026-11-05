@@ -222,6 +222,17 @@ footer { padding: 2rem 1.25rem 3rem; text-align: center; color: var(--ink-2); fo
 .top svg { width: 1.25rem; height: 1.25rem; }
 @media print { .bar, .hero .mode, .tools, .toc, .end, .top, footer, .blobs { display: none !important; } .sec-body { grid-template-rows: 1fr !important; } .sec { break-inside: avoid; box-shadow: none; } .full { display: block; } }
 .note { max-width: 40rem; margin: 1rem auto 0; font-size: .8125rem; color: var(--ink-2); }
+
+/* v2.0.0 flat & minimal: no shadows, gradients, blur or lift. */
+*, *::before, *::after { box-shadow: none !important; text-shadow: none !important; }
+* { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+.blobs { display: none !important; }
+.progress { background: var(--accent) !important; }
+h1 .swap { background: none !important; -webkit-background-clip: border-box !important; background-clip: border-box !important; color: inherit !important; }
+.tools { background: var(--page) !important; }
+.icon-btn:hover, .card:hover .card-icon { transform: none !important; }
+.tabs, .mode, .icon-btn, .search, .toc a, .top, button { border-radius: 4px; }
+.face, .matrix, .dd-col, .sec { border-radius: 20px; }
 </style>
 </head>
 <body>

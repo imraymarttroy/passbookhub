@@ -215,21 +215,67 @@ service cloud.firestore {
         return exists(/databases/$(database)/documents/profiles/$(uid)/circle/$(request.auth.uid));
       }
 
-      // Posts: Public, Circle or Only me.
+      // Posts: Public, Circle or Only me. A repost or quote is a public post with repostOf: { uid, id }.
+      function canSeePost(postId) {
+        let p = get(/databases/$(database)/documents/profiles/$(uid)/posts/$(postId)).data;
+        return signedIn() && (request.auth.uid == uid
+          || p.visibility == 'public'
+          || (p.visibility == 'circle' && inCircle()));
+      }
+      function validRepostOf(data) {
+        return !('repostOf' in data) || (
+          data.repostOf is map && data.repostOf.keys().hasOnly(['uid', 'id'])
+          && data.repostOf.uid is string && data.repostOf.id is string
+          && data.visibility == 'public'
+          && get(/databases/$(database)/documents/profiles/$(data.repostOf.uid)/posts/$(data.repostOf.id)).data.visibility == 'public');
+      }
       match /posts/{postId} {
         allow read: if signedIn() && (request.auth.uid == uid
           || resource.data.visibility == 'public'
           || (resource.data.visibility == 'circle' && inCircle()));
         allow create: if signedInAs(uid) && verified()
-          && request.resource.data.keys().hasOnly(['text', 'visibility', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['text', 'visibility', 'createdAt', 'repostOf'])
           && request.resource.data.text is string
-          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
+          && (request.resource.data.text.size() > 0 || 'repostOf' in request.resource.data)
+          && request.resource.data.text.size() <= 500
           && request.resource.data.visibility in ['public', 'circle', 'private']
-          && request.resource.data.createdAt is int;
-        allow update: if signedInAs(uid)
+          && request.resource.data.createdAt is int
+          && validRepostOf(request.resource.data);
+        allow update: if signedInAs(uid) && !('repostOf' in resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visibility'])
           && request.resource.data.visibility in ['public', 'circle', 'private'];
         allow delete: if signedInAs(uid);
+
+        // likes/{liker}: one like per person.
+        match /likes/{liker} {
+          allow read: if canSeePost(postId);
+          allow create: if signedInAs(liker) && verified() && canSeePost(postId)
+            && request.resource.data.keys().hasOnly(['at']) && request.resource.data.at is int;
+          allow delete: if signedInAs(liker);
+        }
+
+        // replies/{replyId}: anyone who can see the post can reply. The author or the post owner can delete.
+        match /replies/{replyId} {
+          allow read: if canSeePost(postId);
+          allow create: if signedIn() && verified() && canSeePost(postId)
+            && request.resource.data.keys().hasOnly(['author', 'text', 'createdAt'])
+            && request.resource.data.author == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 500
+            && request.resource.data.createdAt is int;
+          allow delete: if signedIn() && (request.auth.uid == uid || request.auth.uid == resource.data.author);
+        }
+
+        // reposts/{reposter}: marks who reposted; postId is the reposter's own repost post.
+        match /reposts/{reposter} {
+          allow read: if canSeePost(postId);
+          allow create: if signedInAs(reposter) && verified()
+            && get(/databases/$(database)/documents/profiles/$(uid)/posts/$(postId)).data.visibility == 'public'
+            && request.resource.data.keys().hasOnly(['at', 'postId'])
+            && request.resource.data.at is int && request.resource.data.postId is string
+            && existsAfter(/databases/$(database)/documents/profiles/$(reposter)/posts/$(request.resource.data.postId));
+          allow delete: if signedInAs(reposter);
+        }
       }
 
       // circle/{member}: written to both people's lists when a request is accepted.
@@ -298,6 +344,11 @@ service cloud.firestore {
         allow delete: if signedInAs(uid)
           || (signedIn() && resource.data.from == request.auth.uid && resource.data.type == 'request');
       }
+    }
+
+    // "For you" feed: a collection-group query over everyone's public posts.
+    match /{path=**}/posts/{postId} {
+      allow read: if request.auth != null && resource.data.visibility == 'public';
     }
 
     // presence/{uid}: when someone last had the app open. Readable by them and their circle.

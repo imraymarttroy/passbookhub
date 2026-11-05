@@ -479,6 +479,112 @@ window.SOC = (function () {
       .sort(function (a, b) { return b.createdAt - a.createdAt; });
   }
 
+  /* ---------- Threads-style feed: likes, replies, reposts, quotes, the public "For you" feed ----------
+     profiles/{owner}/posts/{postId}/likes/{uid}, .../replies/{replyId}, .../reposts/{uid}.
+     A repost or quote is a public post in your own list with repostOf: { uid, id }. */
+
+  const REPLY_MAX = 500;
+  const postDoc = function (owner, id) { return F().doc(db(), 'profiles', owner, 'posts', id); };
+  const subCol = function (owner, id, name) { return F().collection(db(), 'profiles', owner, 'posts', id, name); };
+  const subDoc = function (owner, id, name, key) { return F().doc(db(), 'profiles', owner, 'posts', id, name, key); };
+
+  function countOf(q) {
+    return F().getCountFromServer(q).then(function (s) { return s.data().count; }).catch(function () { return 0; });
+  }
+
+  /** Counts for one post, plus whether you liked or reposted it. Never throws. */
+  async function postStats(owner, id) {
+    const mine = me();
+    const r = await Promise.all([
+      countOf(subCol(owner, id, 'likes')),
+      countOf(subCol(owner, id, 'replies')),
+      countOf(subCol(owner, id, 'reposts')),
+      F().getDoc(subDoc(owner, id, 'likes', mine)).then(function (s) { return s.exists(); }).catch(function () { return false; }),
+      F().getDoc(subDoc(owner, id, 'reposts', mine)).then(function (s) { return s.exists() ? (s.data().postId || '') : null; }).catch(function () { return null; })
+    ]);
+    return { likes: r[0], replies: r[1], reposts: r[2], liked: r[3], repostId: r[4] };
+  }
+
+  async function setLike(owner, id, on) {
+    const ref = subDoc(owner, id, 'likes', me());
+    await run(function () { return on ? F().setDoc(ref, { at: Date.now() }) : F().deleteDoc(ref); });
+  }
+
+  function validateReply(text) {
+    if (!String(text || '').trim()) return 'Write a reply first.';
+    if (text.length > REPLY_MAX) return 'Use ' + REPLY_MAX + ' characters or fewer.';
+    return null;
+  }
+
+  /** Oldest first, with the author's public profile on each reply. */
+  async function listReplies(owner, id) {
+    const q = F().query(subCol(owner, id, 'replies'), F().orderBy('createdAt', 'asc'), F().limit(50));
+    const snap = await run(function () { return F().getDocs(q); });
+    const blocked = await blockedIds().catch(function () { return {}; });
+    const replies = await Promise.all(snap.docs.map(async function (d) {
+      const data = d.data();
+      if (blocked[data.author]) return null;
+      const person = await getProfile(data.author).catch(function () { return null; });
+      return person ? Object.assign({ id: d.id, person: person }, data) : null;
+    }));
+    return replies.filter(Boolean);
+  }
+
+  async function addReply(owner, id, text) {
+    const problem = validateReply(text);
+    if (problem) throw new BT.UserError(problem);
+    const ref = F().doc(subCol(owner, id, 'replies'));
+    const reply = { author: me(), text: text.trim(), createdAt: Date.now() };
+    await run(function () { return F().setDoc(ref, reply); });
+    return Object.assign({ id: ref.id, person: profileCache[me()] || { id: me() } }, reply);
+  }
+
+  async function deleteReply(owner, id, replyId) {
+    await run(function () { return F().deleteDoc(subDoc(owner, id, 'replies', replyId)); });
+  }
+
+  /** One post, or null if it was deleted or you can't see it. */
+  async function getPost(owner, id) {
+    try {
+      const snap = await F().getDoc(postDoc(owner, id));
+      return snap.exists() ? Object.assign({ id: snap.id }, snap.data()) : null;
+    } catch (e) { return null; }
+  }
+
+  /** Repost (no text) or quote (with text). Only public posts can be reposted. */
+  async function repost(owner, id, quote) {
+    const text = String(quote || '').trim();
+    if (text.length > POST_MAX) throw new BT.UserError('Use ' + POST_MAX + ' characters or fewer.');
+    const ref = F().doc(postsCol(me()));
+    const post = { text: text, visibility: 'public', createdAt: Date.now(), repostOf: { uid: owner, id: id } };
+    const batch = F().writeBatch(db());
+    batch.set(ref, post);
+    if (!text) batch.set(subDoc(owner, id, 'reposts', me()), { at: post.createdAt, postId: ref.id });
+    await run(function () { return batch.commit(); });
+    return Object.assign({ id: ref.id }, post);
+  }
+
+  async function undoRepost(owner, id, myPostId) {
+    const batch = F().writeBatch(db());
+    batch.delete(subDoc(owner, id, 'reposts', me()));
+    if (myPostId) batch.delete(F().doc(postsCol(me()), myPostId));
+    await run(function () { return batch.commit(); });
+  }
+
+  /** Public posts from everyone on PassbookHub, newest first. Needs the collection-group index in firestore.indexes.json. */
+  async function publicPosts(limit) {
+    const q = F().query(F().collectionGroup(db(), 'posts'), F().where('visibility', '==', 'public'), F().orderBy('createdAt', 'desc'), F().limit(limit || 40));
+    const snap = await F().getDocs(q);
+    const blocked = await blockedIds().catch(function () { return {}; });
+    const items = await Promise.all(snap.docs.map(async function (d) {
+      const owner = d.ref.parent.parent && d.ref.parent.parent.id;
+      if (!owner || blocked[owner]) return null;
+      const person = await getProfile(owner).catch(function () { return null; });
+      return person ? { person: person, post: Object.assign({ id: d.id }, d.data()), mine: owner === me() } : null;
+    }));
+    return items.filter(Boolean);
+  }
+
   /* ---------- Notifications ---------- */
 
   let unsubscribe = null;
@@ -1053,6 +1159,8 @@ window.SOC = (function () {
     syncProfile: syncProfile, ensureProfile: ensureProfile, getProfile: getProfile, findByUsername: findByUsername, search: search,
     relation: relation, sendRequest: sendRequest, cancelRequest: cancelRequest, acceptRequest: acceptRequest,
     declineRequest: declineRequest, removeFromCircle: removeFromCircle, circleMembers: circleMembers,
+    REPLY_MAX: REPLY_MAX, postStats: postStats, setLike: setLike, validateReply: validateReply, listReplies: listReplies, addReply: addReply, deleteReply: deleteReply,
+    getPost: getPost, repost: repost, undoRepost: undoRepost, publicPosts: publicPosts,
     validatePost: validatePost, createPost: createPost, setPostVisibility: setPostVisibility, deletePost: deletePost, listPosts: listPosts,
     watchNotifications: watchNotifications, stopWatching: stopWatching, onNotifications: onNotifications,
     notifications: notifications, unreadCount: unreadCount, markAllRead: markAllRead, dismissNotification: dismissNotification,
