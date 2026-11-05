@@ -3234,3 +3234,95 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
   .ai-top-btn .top-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 0.8125rem; font-weight: 500; }
   .ai-top-btn svg { width: 1.125rem; height: 1.125rem; color: var(--accent); }
 }
+
+/* ======================================================================
+   Messages: a full page in the app (the floating circles are gone)
+   ====================================================================== */
+.chat-dock .chat-side { display: none !important; }
+.msg-page {
+  display: grid; grid-template-columns: 18rem minmax(0, 1fr); gap: 1rem;
+  height: 100dvh; padding: 3.75rem 1.5rem 1.5rem;
+}
+.msg-side, .msg-pane {
+  min-height: 0; border: 1px solid var(--line); border-radius: 10px; background: transparent; box-shadow: none;
+}
+.msg-side { display: flex; flex-direction: column; padding: 1rem 0.5rem 0.5rem; }
+.msg-side-head { padding: 0 0.5rem 0.75rem; }
+.msg-side-head h1 { margin: 0; font-size: 1.125rem; font-weight: 600; }
+.msg-search-wrap {
+  display: flex; align-items: center; gap: 0.5rem; margin: 0 0.5rem 0.5rem; padding: 0 0.75rem;
+  border: 1px solid var(--line-strong); border-radius: 10px; color: var(--ink-2);
+}
+.msg-search-wrap svg { width: 1rem; height: 1rem; flex: none; }
+.msg-search { flex: 1; min-width: 0; height: 2.25rem; padding: 0; border: 0 !important; background: transparent !important; box-shadow: none !important; outline: 0; color: var(--ink); font: inherit; font-size: 0.875rem; }
+.msg-list { flex: 1; min-height: 0; overflow: auto; }
+.msg-people { list-style: none; margin: 0; padding: 0; }
+.msg-person {
+  display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.5rem; border-radius: 8px;
+  color: var(--ink); text-decoration: none;
+}
+.msg-person:hover { background: var(--wash); }
+.msg-person[aria-current="page"] { background: var(--wash); }
+.msg-names { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.msg-names strong { font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-last { font-size: 0.75rem; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg-person.unread .msg-last { color: var(--ink); font-weight: 600; }
+.msg-person .unread-dot { background: var(--ink); }
+.msg-empty { margin: 0; padding: 1.5rem 0.75rem; text-align: center; font-size: 0.8125rem; color: var(--ink-2); }
+.msg-empty p { margin: 0.25rem 0; }
+
+/* The conversation fills the rest of the page. It reuses the chat window's insides. */
+.msg-pane.chat-pop {
+  position: relative; width: auto; height: auto; display: flex; flex-direction: column; overflow: hidden;
+  border-radius: 10px; border-bottom: 1px solid var(--line); animation: none; box-shadow: none;
+}
+.msg-pane .chat-pop-body { flex: 1; }
+.msg-pane .chat-head { padding: 0.75rem 0.75rem 0.75rem 1rem; box-shadow: none; border-bottom: 1px solid var(--line); }
+.msg-pane .chat-head .icon-btn { color: var(--ink-2); border-radius: 8px; }
+.msg-pane .chat-head .icon-btn:hover { color: var(--ink); background: var(--wash); }
+.msg-pane .chat-head-tools .icon-btn[aria-label="Minimize chat"] { display: none; }
+.msg-pane .chat-thread { padding: 1rem 1.25rem; }
+.msg-pane .bubble-row { max-width: 70%; }
+.msg-pane .chat-compose-wrap, .msg-pane .chat-locked { padding: 0.75rem 1rem 1rem; }
+.msg-pane .chat-composer { border-top: 0; padding-top: 0; }
+.msg-pane .chat-composer textarea { border-radius: 10px; }
+.msg-pane .chat-composer .btn { border-radius: 10px; }
+.msg-back { display: none; }
+.msg-none { margin: auto; text-align: center; padding: 2rem; color: var(--ink-2); font-size: 0.875rem; }
+.msg-none p { margin: 0.25rem 0; }
+.msg-none-title { color: var(--ink); font-size: 1.125rem; font-weight: 600; }
+
+@media (max-width: 760px) {
+  .msg-page { grid-template-columns: minmax(0, 1fr); padding: 3.5rem 0.75rem 0.75rem; height: calc(100dvh - 4rem); }
+  .msg-page.has-chat .msg-side { display: none; }
+  .msg-page:not(.has-chat) .msg-pane { display: none; }
+  .msg-back {
+    display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.625rem 0.75rem 0;
+    color: var(--ink-2); font-size: 0.8125rem; text-decoration: none;
+  }
+  .msg-back svg { width: 1rem; height: 1rem; }
+}
+
+/* ======================================================================
+   Calculator: flat and minimal like the Overview cards (still draggable)
+   ====================================================================== */
+.calc {
+  width: 15rem; padding: 0 0.75rem 0.75rem;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--page); box-shadow: none;
+}
+.calc-head { height: 2.5rem; padding: 0; }
+.calc-head strong { font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.calc-grip { width: 0.875rem; height: 0.375rem; border-block: 1px solid var(--line-strong); }
+.calc-x { border-radius: 8px; }
+.calc-screen { padding: 0.25rem 0.125rem 0.75rem; margin-bottom: 0.75rem; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.calc-out { font-size: 1.75rem; font-weight: 600; }
+.calc-keys { gap: 0.375rem; }
+.calc-key {
+  height: 2.375rem; border: 1px solid var(--line); border-radius: 8px;
+  background: transparent; color: var(--ink); font-size: 0.9375rem; font-weight: 400; box-shadow: none;
+}
+.calc-key:hover { background: var(--wash); border-color: var(--line-strong); }
+.calc-key.fn { background: transparent; color: var(--ink-2); }
+.calc-key.op { background: transparent; color: var(--ink); font-weight: 500; }
+.calc-key.eq { background: var(--ink); border-color: var(--ink); color: var(--page); font-weight: 500; }
+.calc-key.eq:hover { background: var(--ink); opacity: 0.88; }

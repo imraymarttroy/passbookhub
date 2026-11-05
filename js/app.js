@@ -262,9 +262,9 @@
     if (user.needsMfa && !BT.mfaOn() && !state.mfaSkipped) return 'secure';
     if (!user.profileDone) return 'setup';
     if (/^u\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'person';
-    if (/^chat\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'chat';
+    if (/^chat\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'messages';
     if (/^d\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'shared';
-    if (wanted === 'messages') return 'chat';
+    if (wanted === 'messages') return 'messages';
     if (wanted === 'notifications') return 'alerts';
     if (wanted === 'dashboard') return 'dashboard';
     /* After signing in (or with no page in the address), start on the profile. */
@@ -272,7 +272,7 @@
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'shared', 'feed', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'shared', 'feed', 'messages', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -283,6 +283,7 @@
     secure: { title: 'Secure your account', render: viewSecure },
     dashboard: { title: 'Dashboard', render: viewDashboard },
     feed: { title: 'Feed', render: viewFeed },
+    messages: { title: 'Messages', render: viewMessages },
     profile: { title: 'Profile', render: viewTimeline },
     person: { title: 'Profile', render: viewPerson },
     shared: { title: 'Dashboard', render: viewShared },
@@ -295,15 +296,7 @@
   };
 
   function render() {
-    let view = resolveView();
-    if (view === 'chat') {
-      /* Messages live only in the floating chat now: #messages opens the picker, #chat/username opens that person. */
-      const username = location.hash.indexOf('#chat/') === 0 ? location.hash.slice(6) : null;
-      const back = SHELL_VIEWS.indexOf(state.view) !== -1 && state.view !== 'person' && state.view !== 'shared' ? state.view : 'dashboard';
-      history.replaceState(null, '', '#' + back);
-      view = back;
-      setTimeout(function () { if (username) dock.open(username); else dock.openPicker(); }, 0);
-    }
+    const view = resolveView();
     if (!BT.currentUser() && window.WHATS_NEW) WHATS_NEW.resetSession();
     /* The features pop-up belongs to the signed-in app only: never over sign in, sign up or setup. */
     if (SHELL_VIEWS.indexOf(view) === -1 && window.WHATS_NEW && WHATS_NEW.close) WHATS_NEW.close();
@@ -311,12 +304,13 @@
     if (!BT.currentUser() && socialFor) { socialFor = null; SOC.stopWatching(); SOC.stopWatchingChats(); SOC.stopWatchingTrust(); SOC.stopPresence(); onlineCache = null; }
     if (state.cleanup) { state.cleanup(); state.cleanup = null; }
     state.onTrustChange = null;
-    if (view === 'person' || view === 'shared') {
-      /* keep #u/username and #d/username as they are */
+    if (view === 'person' || view === 'shared' || (view === 'messages' && location.hash.indexOf('#chat/') === 0)) {
+      /* keep #u/username, #d/username and #chat/username as they are */
     } else if (location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
     const changed = view !== state.view;
     state.view = view;
     state.refreshDashboard = null;
+    state.refreshMessages = null;
     document.title = (view === 'signin' || view === 'signup') ? 'PassbookHub' : VIEWS[view].title + ' · PassbookHub';
     document.body.classList.toggle('auth-body', view === 'signin' || view === 'signup');
     const content = VIEWS[view].render(view);
@@ -2117,6 +2111,12 @@
     return h('li', null, btn);
   }
 
+  function messagesBadge() {
+    const badge = h('span', { class: 'nav-badge', hidden: true, 'data-kind': 'messages' });
+    badges.push(badge);
+    return badge;
+  }
+
   function shell(view, content) {
     const user = BT.currentUser();
     const current = view;
@@ -2167,6 +2167,7 @@
           dashboardChannel(current),
           item('feed', '#feed', 'Feed'),
           lockedItem('Community'),
+          item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
           h('li', null, h('button', {
             type: 'button',
@@ -4845,9 +4846,75 @@
     if (!link) return;
     const username = link.getAttribute('href').slice(6);
     if (!/^[A-Za-z0-9_]{3,20}$/.test(username) || !BT.currentUser()) return;
-    event.preventDefault();
-    dock.open(username);
+    /* Messages are a full page now: let the link change the address. */
   });
+
+  /* ---------- Messages (full page) ---------- */
+
+  function viewMessages() {
+    const wanted = location.hash.indexOf('#chat/') === 0 ? location.hash.slice(6) : null;
+    let people = null;
+    let panel = null;
+    const me = BT.currentUser();
+    const search = h('input', { type: 'search', class: 'msg-search', placeholder: 'Search your circle', 'aria-label': 'Search your circle', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false' });
+    const list = h('div', { class: 'msg-list', 'aria-live': 'polite' }, h('p', { class: 'msg-empty' }, 'Loading your circle…'));
+    const pane = h('section', { class: 'msg-pane chat-pop', 'aria-label': 'Conversation' });
+    const page = h('div', { class: 'msg-page' + (wanted ? ' has-chat' : '') },
+      h('aside', { class: 'msg-side' },
+        h('div', { class: 'msg-side-head' }, h('h1', null, 'Messages')),
+        h('div', { class: 'msg-search-wrap' }, icon('search'), search),
+        list),
+      pane);
+
+    function drawList() {
+      if (!people) return;
+      const q = search.value.trim().toLowerCase().replace(/^@/, '');
+      if (!people.length) {
+        list.replaceChildren(h('div', { class: 'msg-empty' }, h('p', null, 'Your circle is empty.'),
+          h('p', null, 'Add people from ', h('a', { href: '#circle' }, 'Circle'), ' to message them.')));
+        return;
+      }
+      const ranked = people.map(function (p) { return { p: p, chat: SOC.chatWith(p.id) }; })
+        .filter(function (r) { return !q || r.p.name.toLowerCase().indexOf(q) !== -1 || r.p.username.toLowerCase().indexOf(q) !== -1; })
+        .sort(function (a, b) { return ((b.chat && b.chat.lastAt) || 0) - ((a.chat && a.chat.lastAt) || 0) || a.p.name.localeCompare(b.p.name); });
+      if (!ranked.length) { list.replaceChildren(h('p', { class: 'msg-empty' }, 'No one matches \u201c' + search.value.trim() + '\u201d.')); return; }
+      list.replaceChildren(h('ul', { class: 'msg-people' }, ranked.map(function (r) {
+        const unread = SOC.isUnread(r.chat);
+        const here = wanted && wanted.toLowerCase() === r.p.username.toLowerCase();
+        return h('li', null, h('a', {
+          class: 'msg-person' + (unread ? ' unread' : ''), href: '#chat/' + r.p.username, 'aria-current': here ? 'page' : null
+        },
+        avatar(r.p, r.p.avatar, 2.25),
+        h('span', { class: 'msg-names' },
+          h('strong', null, r.p.name),
+          h('span', { class: 'msg-last' }, r.chat && r.chat.lastText ? [(r.chat.lastFrom === me.id ? 'You: ' : ''), r.chat.lastText] : '@' + r.p.username)),
+        unread ? h('span', { class: 'unread-dot' }, h('span', { class: 'vh' }, 'Unread')) : null));
+      })));
+    }
+    search.addEventListener('input', drawList);
+    search.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); const first = list.querySelector('.msg-person'); if (first) first.click(); }
+    });
+    SOC.circleMembers().then(function (found) { people = found; drawList(); })
+      .catch(function (error) { list.replaceChildren(h('p', { class: 'msg-empty' }, error.message || 'We could not load your circle.')); });
+
+    if (wanted) {
+      panel = chatPanel(wanted, {
+        isOpen: function () { return !!pane.isConnected; },
+        minimize: function () { location.hash = '#messages'; },
+        close: function () { location.hash = '#messages'; },
+        onPerson: function () {}
+      });
+      pane.append(h('a', { class: 'msg-back', href: '#messages', 'aria-label': 'Back to messages' }, icon('prev'), h('span', null, 'Messages')), panel.el);
+      setTimeout(function () { if (panel) panel.focus(); }, 0);
+    } else {
+      pane.append(h('div', { class: 'msg-none' }, h('p', { class: 'msg-none-title' }, 'Your messages'), h('p', null, 'Pick someone from your circle to start chatting.')));
+    }
+    state.refreshMessages = function () { drawList(); if (panel) panel.refresh(); };
+    const prev = state.cleanup;
+    state.cleanup = function () { if (panel) { panel.destroy(); panel = null; } if (prev) prev(); };
+    return page;
+  }
 
   /* ---------- Notifications ---------- */
 
@@ -5855,6 +5922,7 @@
   /* ---------- Start ---------- */
 
   SOC.onChats(function (list) {
+    if (state.view === 'messages' && state.refreshMessages) state.refreshMessages(list);
     drawBadges();
     dock.onChats(list);
   });
