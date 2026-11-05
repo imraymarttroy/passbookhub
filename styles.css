@@ -2992,3 +2992,4 @@ a.nav-sub-item:hover { background: var(--wash); color: var(--ink); }
 .calc-key.eq { background: var(--ink); border-color: var(--ink); color: var(--on-ink); font-weight: 700; }
 .calc-key.eq:hover { background: color-mix(in srgb, var(--ink) 86%, var(--page)); }
 @media print { .calc { display: none !important; } }
+.calc-out { overflow: hidden; text-overflow: ellipsis; scrollbar-width: none; }
