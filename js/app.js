@@ -52,6 +52,7 @@
     search: '<circle cx="8.5" cy="8.5" r="5"/><path d="m12.5 12.5 4 4"/>',
     up: '<path d="m5 12.5 5-5 5 5"/>',
     down: '<path d="m5 7.5 5 5 5-5"/>',
+    lock: '<rect x="4.5" y="9" width="11" height="8" rx="1.5"/><path d="M7 9V6.5a3 3 0 0 1 6 0V9"/>',
     smile: '<circle cx="10" cy="10" r="7.5"/><path d="M7 11.5a3.5 3.5 0 0 0 6 0M7.5 8h.01M12.5 8h.01"/>',
     clip: '<path d="m15.5 9.5-5.8 5.8a3.5 3.5 0 0 1-5-5l6.4-6.4a2.3 2.3 0 0 1 3.3 3.3l-6.3 6.3a1.2 1.2 0 0 1-1.7-1.7l5.6-5.6"/>',
     image: '<rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="7.5" cy="8.5" r="1.3"/><path d="m3.5 14.5 4-4 3 3 2-2 4 4"/>',
@@ -306,6 +307,7 @@
     if (!BT.currentUser() && window.WHATS_NEW) WHATS_NEW.resetSession();
     /* The features pop-up belongs to the signed-in app only: never over sign in, sign up or setup. */
     if (SHELL_VIEWS.indexOf(view) === -1 && window.WHATS_NEW && WHATS_NEW.close) WHATS_NEW.close();
+    if (SHELL_VIEWS.indexOf(view) === -1) calculator.close();
     if (!BT.currentUser() && socialFor) { socialFor = null; SOC.stopWatching(); SOC.stopWatchingChats(); SOC.stopWatchingTrust(); SOC.stopPresence(); onlineCache = null; }
     if (state.cleanup) { state.cleanup(); state.cleanup = null; }
     state.onTrustChange = null;
@@ -1702,6 +1704,192 @@
     return button;
   }
 
+  /* ---------- Calculator: a small window you can drag anywhere ---------- */
+
+  const CALC_ICON = '<rect x="4" y="2.5" width="12" height="15" rx="2"/><path d="M7 6h6"/><path d="M7.5 10h.01M10 10h.01M12.5 10h.01M7.5 12.75h.01M10 12.75h.01M12.5 12.75h.01M7.5 15.25h.01M10 15.25h.01M12.5 15.25h.01"/>';
+
+  function calcButton() {
+    const button = h('button', {
+      type: 'button', class: 'top-btn calc-btn', title: 'Calculator', 'aria-label': 'Calculator', 'aria-pressed': calculator.isOpen() ? 'true' : 'false',
+      onclick: function () { calculator.toggle(); }
+    });
+    button.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + CALC_ICON + '</svg><span class="top-label">Calculator</span>';
+    return button;
+  }
+
+  /** Evaluates digits with + − × ÷ and %, respecting × ÷ before + −. Returns null if incomplete. */
+  function calcEval(tokens) {
+    const t = tokens.slice();
+    if (!t.length) return 0;
+    if (typeof t[t.length - 1] !== 'number') t.pop();
+    if (!t.length) return 0;
+    const sum = [t[0]];
+    const ops = [];
+    for (let i = 1; i < t.length; i += 2) {
+      const op = t[i], n = t[i + 1];
+      if (op === '×') sum[sum.length - 1] *= n;
+      else if (op === '÷') { if (n === 0) return NaN; sum[sum.length - 1] /= n; }
+      else { ops.push(op); sum.push(n); }
+    }
+    let total = sum[0];
+    ops.forEach(function (op, i) { total = op === '+' ? total + sum[i + 1] : total - sum[i + 1]; });
+    return Math.round(total * 1e10) / 1e10;
+  }
+
+  const calculator = (function () {
+    let box = null;
+    let tokens = [];   /* numbers and operators already entered */
+    let entry = '';    /* the number being typed */
+    let justEqualled = false;
+    let exprEl, outEl;
+
+    function fmt(n) {
+      if (!isFinite(n)) return 'Can’t divide by 0';
+      return n.toLocaleString(I18N.locale || 'en-PH', { maximumFractionDigits: 10 });
+    }
+    function fmtEntry(s) {
+      if (s === '' || s === '-') return s || '0';
+      const parts = s.split('.');
+      const whole = Number(parts[0]).toLocaleString(I18N.locale || 'en-PH');
+      return (s[0] === '-' && whole[0] !== '-' ? '-' : '') + whole + (parts.length > 1 ? '.' + parts[1] : '');
+    }
+    function current() { return entry === '' ? null : parseFloat(entry); }
+    function draw() {
+      const shown = tokens.map(function (x) { return typeof x === 'number' ? fmt(x) : ' ' + x + ' '; }).join('');
+      exprEl.textContent = shown + (entry && !justEqualled ? fmtEntry(entry) : '') || ' ';
+      const all = entry !== '' ? tokens.concat([current()]) : tokens;
+      outEl.textContent = entry !== '' && !tokens.length ? fmtEntry(entry) : fmt(calcEval(all));
+    }
+    function press(key) {
+      if (/^[0-9]$/.test(key)) {
+        if (justEqualled) { tokens = []; entry = ''; justEqualled = false; }
+        if (entry.replace(/[-.]/g, '').length >= 15) return;
+        entry = entry === '0' ? key : entry === '-0' ? '-' + key : entry + key;
+      } else if (key === '.') {
+        if (justEqualled) { tokens = []; entry = ''; justEqualled = false; }
+        if (entry.indexOf('.') === -1) entry = (entry === '' || entry === '-' ? entry + '0' : entry) + '.';
+      } else if (['+', '−', '×', '÷'].indexOf(key) !== -1) {
+        justEqualled = false;
+        if (entry !== '' && entry !== '-') { tokens.push(current()); entry = ''; }
+        if (!tokens.length) tokens.push(0);
+        if (typeof tokens[tokens.length - 1] === 'number') tokens.push(key);
+        else tokens[tokens.length - 1] = key;
+      } else if (key === '=') {
+        if (entry !== '' && entry !== '-') { tokens.push(current()); entry = ''; }
+        const r = calcEval(tokens);
+        tokens = [];
+        entry = isFinite(r) ? String(r) : '';
+        justEqualled = true;
+        draw();
+        if (!isFinite(r)) outEl.textContent = fmt(r);
+        else exprEl.textContent = ' ';
+        return;
+      } else if (key === 'C') {
+        tokens = []; entry = ''; justEqualled = false;
+      } else if (key === '⌫') {
+        if (justEqualled) { justEqualled = false; }
+        if (entry) entry = entry.slice(0, -1);
+        else if (tokens.length) { const last = tokens.pop(); if (typeof last === 'number') entry = String(last); }
+      } else if (key === '±') {
+        if (entry === '' && justEqualled) entry = '0';
+        entry = entry[0] === '-' ? entry.slice(1) : '-' + (entry || '');
+        justEqualled = false;
+      } else if (key === '%') {
+        const n = current();
+        if (n === null) return;
+        /* 500 + 10% means 10% of 500, like a phone calculator. */
+        const base = tokens.length >= 2 && (tokens[tokens.length - 1] === '+' || tokens[tokens.length - 1] === '−') ? calcEval(tokens.slice(0, -1)) : 1;
+        entry = String(Math.round(base * n / 100 * 1e10) / 1e10);
+        justEqualled = false;
+      }
+      draw();
+    }
+
+    function place(x, y) {
+      const w = box.offsetWidth, ht = box.offsetHeight;
+      x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
+      y = Math.max(8, Math.min(y, window.innerHeight - ht - 8));
+      box.style.left = x + 'px';
+      box.style.top = y + 'px';
+      return { x: x, y: y };
+    }
+
+    function open() {
+      if (box) { box.querySelector('.calc-keys button').focus(); return; }
+      exprEl = h('div', { class: 'calc-expr num', 'aria-hidden': 'true' }, ' ');
+      outEl = h('output', { class: 'calc-out num', 'aria-live': 'polite', title: 'Click to copy' }, '0');
+      outEl.addEventListener('click', function () {
+        const text = outEl.textContent.replace(/,/g, '');
+        if (navigator.clipboard && isFinite(parseFloat(text))) navigator.clipboard.writeText(text).then(function () { toast('Copied ' + outEl.textContent + '.'); }, function () {});
+      });
+      const KEYS = ['C', '±', '%', '÷', '7', '8', '9', '×', '4', '5', '6', '−', '1', '2', '3', '+', '0', '.', '⌫', '='];
+      const keys = h('div', { class: 'calc-keys' }, KEYS.map(function (k) {
+        const kind = ['÷', '×', '−', '+'].indexOf(k) !== -1 ? ' op' : k === '=' ? ' eq' : ['C', '±', '%', '⌫'].indexOf(k) !== -1 ? ' fn' : '';
+        const label = { 'C': 'Clear', '±': 'Plus or minus', '%': 'Percent', '÷': 'Divide', '×': 'Multiply', '−': 'Minus', '+': 'Plus', '=': 'Equals', '⌫': 'Delete', '.': 'Decimal point' }[k];
+        return h('button', { type: 'button', class: 'calc-key' + kind, 'aria-label': label || null, onclick: function () { press(k); } }, k);
+      }));
+      const closeBtn = h('button', { type: 'button', class: 'calc-x', 'aria-label': 'Close calculator', title: 'Close', onclick: function () { close(); } }, icon('close'));
+      const head = h('div', { class: 'calc-head', title: 'Drag to move' }, h('span', { class: 'calc-grip', 'aria-hidden': 'true' }), h('strong', null, 'Calculator'), closeBtn);
+      box = h('div', { class: 'calc', role: 'dialog', 'aria-label': 'Calculator', tabindex: '-1', 'data-no-translate': '' },
+        head, h('div', { class: 'calc-screen' }, exprEl, outEl), keys);
+      document.body.appendChild(box);
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem('pbh.calcPos') || 'null'); } catch (e) { saved = null; }
+      if (saved && typeof saved.x === 'number') place(saved.x, saved.y);
+      else place(window.innerWidth - box.offsetWidth - 24, 64);
+
+      /* Drag by the title bar (mouse, pen or touch). */
+      let drag = null;
+      head.addEventListener('pointerdown', function (e) {
+        if (e.target.closest('button')) return;
+        const r = box.getBoundingClientRect();
+        drag = { dx: e.clientX - r.left, dy: e.clientY - r.top, id: e.pointerId };
+        head.setPointerCapture(e.pointerId);
+        box.classList.add('dragging');
+        e.preventDefault();
+      });
+      head.addEventListener('pointermove', function (e) {
+        if (!drag || e.pointerId !== drag.id) return;
+        place(e.clientX - drag.dx, e.clientY - drag.dy);
+      });
+      function endDrag(e) {
+        if (!drag || e.pointerId !== drag.id) return;
+        drag = null;
+        box.classList.remove('dragging');
+        try { localStorage.setItem('pbh.calcPos', JSON.stringify({ x: box.offsetLeft, y: box.offsetTop })); } catch (err) { /* storage off */ }
+      }
+      head.addEventListener('pointerup', endDrag);
+      head.addEventListener('pointercancel', endDrag);
+
+      /* Keyboard: type numbers while the calculator has focus. */
+      box.addEventListener('keydown', function (e) {
+        const map = { '*': '×', 'x': '×', '/': '÷', '-': '−', '+': '+', 'Enter': '=', '=': '=', 'Backspace': '⌫', 'Escape': 'C', 'Delete': 'C', '%': '%', '.': '.', ',': '.' };
+        const k = /^[0-9]$/.test(e.key) ? e.key : map[e.key];
+        if (!k) return;
+        if (e.key === 'Escape' && !tokens.length && !entry) { close(); return; }
+        e.preventDefault();
+        press(k);
+      });
+      window.addEventListener('resize', keepInside);
+      draw();
+      sync();
+      box.focus();
+    }
+    function keepInside() { if (box) place(box.offsetLeft, box.offsetTop); }
+    function close() {
+      if (!box) return;
+      window.removeEventListener('resize', keepInside);
+      box.remove();
+      box = null;
+      sync();
+    }
+    function sync() {
+      document.querySelectorAll('.calc-btn').forEach(function (b) { b.setAttribute('aria-pressed', box ? 'true' : 'false'); });
+    }
+    return { open: open, close: close, toggle: function () { if (box) close(); else open(); }, isOpen: function () { return !!box; } };
+  })();
+
   /** Footer text toggle: "Dark mode" / "Light mode", next to Language. */
   function themeTextButton() {
     const button = h('button', { type: 'button', class: 'lang-btn theme-text-btn theme-btn' });
@@ -1858,6 +2046,45 @@
     return wrap;
   }
 
+  /* Dashboard as a channel: click it and its sections open underneath. Only Overview is open for now. */
+  const DASH_CHANNEL = [['overview', 'Overview', false], ['wallet', 'Wallet', true], ['savings', 'Savings', true],
+    ['credit', 'Credit', true], ['loan', 'Loan', true], ['budget', '50/30/20 budget rule', true]];
+  function dashboardChannel(current) {
+    let open = current === 'dashboard';
+    try { if (!open) open = localStorage.getItem('pbh.dashOpen') === '1'; } catch (e) { /* storage off */ }
+    const here = current === 'dashboard';
+    const sub = h('ul', { class: 'nav-sub', id: 'nav-sub-dashboard', hidden: !open },
+      DASH_CHANNEL.map(function (c) {
+        if (!c[2]) {
+          return h('li', null, h('a', { class: 'nav-sub-item', href: '#dashboard', 'aria-current': here ? 'page' : null },
+            h('span', { class: 'nav-hash', 'aria-hidden': 'true' }, '#'), h('span', { class: 'nav-label' }, c[1])));
+        }
+        return h('li', null, h('button', {
+          type: 'button', class: 'nav-sub-item locked', 'aria-disabled': 'true', title: c[1] + ' is coming soon',
+          onclick: function () { toast(c[1] + ' is coming soon.'); }
+        }, h('span', { class: 'nav-hash', 'aria-hidden': 'true' }, '#'), h('span', { class: 'nav-label' }, c[1]),
+          h('span', { class: 'nav-lock' }, icon('lock'), h('span', { class: 'vh' }, '(locked)'))));
+      }));
+    const chev = h('button', {
+      type: 'button', class: 'nav-chev' + (open ? ' open' : ''), 'aria-controls': 'nav-sub-dashboard',
+      'aria-expanded': open ? 'true' : 'false', 'aria-label': open ? 'Hide dashboard sections' : 'Show dashboard sections',
+      onclick: function () { setOpen(sub.hidden); }
+    }, icon('down'));
+    function setOpen(on) {
+      sub.hidden = !on;
+      chev.classList.toggle('open', on);
+      chev.setAttribute('aria-expanded', on ? 'true' : 'false');
+      chev.setAttribute('aria-label', on ? 'Hide dashboard sections' : 'Show dashboard sections');
+      try { localStorage.setItem('pbh.dashOpen', on ? '1' : '0'); } catch (e) { /* storage off */ }
+    }
+    const link = h('a', {
+      class: 'nav-item', href: '#dashboard', title: 'Dashboard', 'aria-current': here ? 'page' : null,
+      onclick: function () { setOpen(true); }
+    }, navIcon('dashboard'), h('span', { class: 'nav-label' }, 'Dashboard'),
+      h('span', { class: 'nav-pin', title: 'Private: only you can see your dashboard' }, icon('pin'), h('span', { class: 'vh' }, '(private)')));
+    return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
+  }
+
   function shell(view, content) {
     const user = BT.currentUser();
     const current = view;
@@ -1880,6 +2107,7 @@
       aiBtn,
       themeButton(),
       topLink('notifications', '#alerts', 'Alerts'),
+      calcButton(),
       topLink('settings', '#settings', 'Settings'));
     let collapsed = false;
     try { collapsed = localStorage.getItem('pbh.sideCollapsed') === '1'; } catch (e) { /* storage off */ }
@@ -1904,8 +2132,7 @@
       statusMenu(user, current === 'profile' || current === 'circle'),
       h('nav', { 'aria-label': 'Main' },
         h('ul', { class: 'nav-list' },
-          item('dashboard', '#dashboard', 'Dashboard',
-            h('span', { class: 'nav-pin', title: 'Private: only you can see your dashboard' }, icon('pin'), h('span', { class: 'vh' }, '(private)'))),
+          dashboardChannel(current),
           item('feed', '#feed', 'Feed'),
           h('li', null, h('button', {
             type: 'button',
@@ -5057,7 +5284,6 @@
           user.bio ? h('p', { class: 'small muted' }, user.bio) : null),
         book.mine ? privatePin(trust) : sharedBadge(book)),
       trust,
-      h('div', { class: 'dash-tabs', role: 'tablist', 'aria-label': 'Dashboard sections' }, tabButtons),
       overviewPanel,
       trackerPanel,
       budgetPanel,
