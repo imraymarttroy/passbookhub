@@ -2145,7 +2145,11 @@
       } });
     b.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.5 9 10 12.5 13.5 9M4 15.5h12"/></svg><span>Install app</span>';
     const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
-    function sync() { b.hidden = standalone || !window.__pbhInstall; }
+    function sync() {
+      if (!b.isConnected && b.dataset.mounted) { document.removeEventListener('pbh-installable', sync); return; }
+      b.hidden = standalone || !window.__pbhInstall;
+    }
+    setTimeout(function () { b.dataset.mounted = '1'; }, 0);
     document.addEventListener('pbh-installable', sync);
     sync();
     return b;
