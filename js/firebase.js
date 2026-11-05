@@ -41,7 +41,7 @@ try {
   await import('./core.js?v=17');
   await import('./social.js?v=22');
   await import('./overview.js?v=5');
-  await import('./whats-new.js?v=1');
+  await import('./whats-new.js?v=2');
   await import('./app.js?v=46');
 } catch (error) {
   console.error(error);
