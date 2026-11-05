@@ -2047,9 +2047,7 @@
             }
           }, h('span', { class: 'status-dot ' + o[1], 'aria-hidden': 'true' }),
             h('span', { class: 'status-item-text' }, h('strong', null, o[2]), h('span', { class: 'small muted' }, o[3])));
-        }),
-        h('hr', { class: 'status-sep' }),
-        h('a', { class: 'status-item status-profile', role: 'menuitem', href: '#profile', onclick: closeNow }, h('strong', null, 'View profile')));
+        }));
       document.body.appendChild(menu);
       btn.setAttribute('aria-expanded', 'true');
       reposition();
