@@ -3149,7 +3149,10 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 .chat-dock.ai-open .ai-composer textarea::placeholder { color: var(--ink-2); }
 .ai-send { display: grid; place-items: center; width: 2.25rem; padding: 0 !important; border-radius: 50% !important; }
 .ai-send svg { width: 1.125rem; height: 1.125rem; }
-.chat-dock.ai-open .ai-send { width: 2rem; min-height: 2rem !important; height: 2rem; background: var(--ink); color: var(--ai-bg); border: 0; box-shadow: none; }
+.chat-dock.ai-open .ai-send { width: 2rem; min-height: 2rem !important; height: 2rem; background: transparent; color: var(--ink-2); border: 0; box-shadow: none; }
+.chat-dock.ai-open .ai-send:hover:not(:disabled) { background: transparent; color: var(--ink); }
+.chat-dock.ai-open .ai-send:disabled { opacity: 0.4; }
+.chat-dock.ai-open .ai-send svg { width: 1.25rem; height: 1.25rem; }
 .chat-dock.ai-open .ai-note { text-align: center; font-size: 0.6875rem; margin: 0.5rem 0 0; }
 
 /* Chips: thin outline pills */
@@ -3178,3 +3181,11 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
   .chat-dock .chat-side { transition: none; }
   .ai-chip:hover::after, .top-btn.ai-top-btn:hover::after { animation: none; }
 }
+
+/* Version button sits above the online count in the sidebar (top bar on small screens). */
+.sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+.sidebar-foot .sidebar-online { margin-top: 0; }
+.side-version { width: 100%; justify-content: flex-start; padding: 0 0.75rem; }
+.top-version { display: none; }
+@media (min-width: 761px) { .collapsed .side-version { display: none; } }
+@media (max-width: 760px) { .sidebar-foot { display: none; } .top-version { display: inline-flex; } }

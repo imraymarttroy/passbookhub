@@ -1927,12 +1927,12 @@
   }
 
   /** "v2.0.0" beside the AI button: opens what's new in this version. The dot glows until you have seen it. */
-  function versionButton() {
+  function versionButton(extra) {
     const uid = BT.currentUser() ? BT.currentUser().id : null;
     const version = window.WHATS_NEW ? WHATS_NEW.version : '';
     const fresh = window.WHATS_NEW && WHATS_NEW.isNew ? WHATS_NEW.isNew(uid) : false;
     return h('button', {
-      type: 'button', class: 'version-btn' + (fresh ? ' is-new' : ''), title: 'What\u2019s new in v' + version,
+      type: 'button', class: 'version-btn' + (extra || ' top-version') + (fresh ? ' is-new' : ''), title: 'What\u2019s new in v' + version,
       'aria-label': 'What\u2019s new in version ' + version, 'data-no-translate': '',
       onclick: function () { if (window.WHATS_NEW) WHATS_NEW.show(uid); }
     }, h('span', { class: 'version-dot', 'aria-hidden': 'true' }), 'v' + version);
@@ -2101,14 +2101,18 @@
     return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
   }
 
-  /* Community: locked until there is content for it. */
-  function communityItem() {
+  /* Community and Blog: locked until there is content for them. */
+  const LOCKED_NAV = {
+    Community: '<circle cx="7.5" cy="7" r="2.5"/><circle cx="13.5" cy="8" r="2"/><path d="M3 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12.5 12.2c1.9-.2 3.6.9 4.2 3.3"/>',
+    Blog: '<path d="M5 3.5h7l3 3v10H5z"/><path d="M12 3.5v3h3M7.5 10h5M7.5 13h3.5"/>'
+  };
+  function lockedItem(label) {
     const btn = h('button', {
-      type: 'button', class: 'nav-item locked', 'aria-disabled': 'true', title: 'Community is coming soon',
-      onclick: function () { toast('Community is coming soon.'); }
+      type: 'button', class: 'nav-item locked', 'aria-disabled': 'true', title: label + ' is coming soon',
+      onclick: function () { toast(label + ' is coming soon.'); }
     });
-    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="7" r="2.5"/><circle cx="13.5" cy="8" r="2"/><path d="M3 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12.5 12.2c1.9-.2 3.6.9 4.2 3.3"/></svg>';
-    btn.append(h('span', { class: 'nav-label' }, 'Community'), h('span', { class: 'nav-lock' }, icon('lock'), h('span', { class: 'vh' }, '(locked)')));
+    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + LOCKED_NAV[label] + '</svg>';
+    btn.append(h('span', { class: 'nav-label' }, label), h('span', { class: 'nav-lock' }, icon('lock'), h('span', { class: 'vh' }, '(locked)')));
     return h('li', null, btn);
   }
 
@@ -2161,7 +2165,8 @@
         h('ul', { class: 'nav-list' },
           dashboardChannel(current),
           item('feed', '#feed', 'Feed'),
-          communityItem(),
+          lockedItem('Community'),
+          lockedItem('Blog'),
           h('li', null, h('button', {
             type: 'button',
             class: 'nav-item',
@@ -2178,7 +2183,7 @@
               BT.signOut();
             }
           }, navIcon('signout'), h('span', { class: 'nav-label' }, 'Sign out'))))),
-      onlineBadge());
+      h('div', { class: 'sidebar-foot' }, versionButton(' side-version'), onlineBadge()));
     drawBadges();
     const shellEl = h('div', { class: 'app-shell' },
       h('div', { class: 'bg-orbs', 'aria-hidden': 'true' }, h('span'), h('span')),
