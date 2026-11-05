@@ -1100,6 +1100,22 @@ window.SOC = (function () {
     }
   }
 
+  /** Deletes your own dashboard records (entries, accounts, debts, goals, activity). Returns how many were removed. */
+  async function resetMyRecords() {
+    const uid = me();
+    const refs = [];
+    for (const name of ['tx', 'accounts', 'debts', 'goals', 'activity']) {
+      const snap = await run(function () { return F().getDocs(F().collection(db(), 'users', uid, name)); });
+      snap.docs.forEach(function (d) { refs.push(d.ref); });
+    }
+    for (let i = 0; i < refs.length; i += 400) {
+      const batch = F().writeBatch(db());
+      refs.slice(i, i + 400).forEach(function (r) { batch.delete(r); });
+      await run(function () { return batch.commit(); });
+    }
+    return refs.length;
+  }
+
   /* ---------- Account deletion ---------- */
 
   /** Removes everything social that belongs to the signed-in person. Call before deleting the account. */
@@ -1164,7 +1180,7 @@ window.SOC = (function () {
     validatePost: validatePost, createPost: createPost, setPostVisibility: setPostVisibility, deletePost: deletePost, listPosts: listPosts,
     watchNotifications: watchNotifications, stopWatching: stopWatching, onNotifications: onNotifications,
     notifications: notifications, unreadCount: unreadCount, markAllRead: markAllRead, dismissNotification: dismissNotification,
-    deleteEverything: deleteEverything,
+    deleteEverything: deleteEverything, resetMyRecords: resetMyRecords,
     blockedList: blockedList, blockPerson: blockPerson, unblockPerson: unblockPerson,
     startPresence: startPresence, stopPresence: stopPresence, onlineCircle: onlineCircle,
     presenceOf: presenceOf, setStatusChoice: setStatusChoice, myStatusChoice: myStatusChoice, myStatus: myStatus,

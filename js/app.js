@@ -1407,6 +1407,22 @@
         h('button', { class: 'btn primary', type: 'submit' }, 'Save changes'),
         h('a', { class: 'link', href: '#profile' }, 'Cancel')));
 
+    const resetBox = h('div', { class: 'reset-box' },
+      h('p', { class: 'small muted' }, 'Start fresh: removes every entry, account, debt, goal and activity log on your dashboard. Your profile, posts, circle and chats stay.'),
+      h('button', { type: 'button', class: 'btn danger', onclick: async function (event) {
+        const button = event.currentTarget;
+        const ok = await ask({ title: 'Reset all your records?', body: 'This permanently removes every entry, account, debt, goal and activity log on your dashboard. You can\u2019t undo this.', yes: 'Reset everything', no: 'Cancel' });
+        if (!ok) return;
+        button.disabled = true;
+        button.textContent = 'Resetting\u2026';
+        try {
+          const n = await SOC.resetMyRecords();
+          SOC.publishSavings(0, user.currency).catch(function () {});
+          toast(n ? 'Done. ' + n + ' record' + (n === 1 ? '' : 's') + ' removed.' : 'Done. There was nothing to remove.');
+        } catch (error) { toast(error.message); }
+        button.disabled = false;
+        button.textContent = 'Reset my records';
+      } }, 'Reset my records'));
     const dangerBox = h('div');
     function showDelete() {
       dangerBox.replaceChildren(h('button', { type: 'button', class: 'btn', onclick: showConfirm }, 'Delete account'));
@@ -1478,6 +1494,7 @@
       h('div', { class: 'pf-side' },
         accountCard(function () {}),
         card('Security', 'lock', security, 'set-security'),
+        card('Reset my records', null, resetBox, 'set-reset'),
         card('Delete account', null, h('div', null,
           h('p', { class: 'small muted', style: 'margin:0 0 0.75rem' }, 'Permanently remove your profile, budget, accounts and messages.'),
           dangerBox), 'set-danger')));
@@ -1977,11 +1994,12 @@
 
   function statusMenu(user, here) {
     const wrap = h('div', { class: 'me-wrap' });
+    /* The picture opens the status menu; the name goes to your profile. */
     const btn = h('button', {
-      type: 'button', class: 'sidebar-me', title: 'Your status', 'aria-haspopup': 'menu', 'aria-expanded': 'false',
-      'aria-current': here ? 'page' : null
-    }, avatarWithStatus(user, 2.25),
-      h('span', { class: 'sidebar-me-text' }, h('strong', null, user.name), h('span', { class: 'small muted' }, '@' + user.username)));
+      type: 'button', class: 'sidebar-me-pic', title: 'Set your status', 'aria-label': 'Set your status', 'aria-haspopup': 'menu', 'aria-expanded': 'false'
+    }, avatarWithStatus(user, 2.25));
+    const nameLink = h('a', { class: 'sidebar-me-text', href: '#profile', title: 'Your profile', 'aria-current': here ? 'page' : null },
+      h('strong', null, user.name), h('span', { class: 'small muted' }, '@' + user.username));
     const OPTIONS = [
       ['auto', 'online', 'Online', 'Turns to Idle when you\u2019re away'],
       ['idle', 'idle', 'Idle', 'Your circle sees a half moon'],
@@ -2042,13 +2060,13 @@
       (menu.querySelector('[aria-checked="true"]') || menu.querySelector('.status-item')).focus();
     }
     btn.addEventListener('click', function () { if (menu) close(false); else open(); });
-    wrap.appendChild(btn);
+    wrap.appendChild(h('div', { class: 'sidebar-me' + (here ? ' here' : '') }, btn, nameLink));
     return wrap;
   }
 
   /* Dashboard as a channel: click it and its sections open underneath. Only Overview is open for now. */
   const DASH_CHANNEL = [['overview', 'Overview', false], ['wallet', 'Wallet', true], ['savings', 'Savings', true],
-    ['credit', 'Credit', true], ['loan', 'Loan', true], ['budget', '50/30/20 budget rule', true]];
+    ['credit', 'Credit', true], ['loan', 'Loan', true]];
   function dashboardChannel(current) {
     let open = current === 'dashboard';
     try { if (!open) open = localStorage.getItem('pbh.dashOpen') === '1'; } catch (e) { /* storage off */ }
@@ -4536,7 +4554,8 @@
 
     function key() { return 'pbh.chatDock.' + owner; }
     function save() {
-      try { localStorage.setItem(key(), JSON.stringify({ active: active, items: items.map(function (i) { return i.username; }) })); } catch (e) { /* storage off */ }
+      const keep = items.filter(function (i) { return i.username !== AI_USER; });
+      try { localStorage.setItem(key(), JSON.stringify({ active: active === AI_USER ? null : active, items: keep.map(function (i) { return i.username; }) })); } catch (e) { /* storage off */ }
     }
     function restore() {
       try {
@@ -4557,7 +4576,7 @@
     }
 
     function drawBubbles() {
-      bubbles.replaceChildren.apply(bubbles, items.filter(function (i) { return i.username !== active; }).map(function (item) {
+      bubbles.replaceChildren.apply(bubbles, items.filter(function (i) { return i.username !== active && i.username !== AI_USER; }).map(function (item) {
         const unread = isUnread(item);
         const name = item.person ? item.person.name : '@' + item.username;
         return h('div', { class: 'chat-bubble-wrap' },
@@ -4572,7 +4591,7 @@
             onclick: function () { close(item.username); }
           }, icon('close')));
       }));
-      el.classList.toggle('has-bubbles', items.length > (active ? 1 : 0));
+      el.classList.toggle('has-bubbles', items.filter(function (i) { return i.username !== AI_USER && i.username !== active; }).length > 0);
     }
 
     function ensurePerson(item) {
@@ -4633,18 +4652,11 @@
       drawList();
       setTimeout(function () { if (input.isConnected) input.focus({ preventScroll: true }); }, 0);
 
-      const aiRow = h('button', {
-        type: 'button', class: 'picker-person picker-ai',
-        onclick: function () { picking = false; launcher.setAttribute('aria-expanded', 'false'); open(AI_USER); }
-      }, aiAvatar(2.25),
-        h('span', { class: 'picker-names' }, h('strong', null, 'Ask PassbookHub AI'), h('span', { class: 'small muted' }, 'Budgeting, saving, debt and investing help')),
-        h('span', { class: 'ai-badge' }, 'AI'));
       const node = h('div', { class: 'chat-pop-body picker' },
         h('header', { class: 'chat-head' },
           h('strong', { class: 'picker-title' }, 'New message'),
           h('div', { class: 'chat-head-tools' },
             h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close', title: 'Close', onclick: function () { closePicker(); } }, icon('close')))),
-        h('div', { class: 'picker-ai-wrap' }, aiRow),
         h('div', { class: 'picker-search-wrap' }, icon('search'), input),
         list);
       node.refresh = drawList;
@@ -4720,6 +4732,8 @@
 
     /** Shrinks the window into a circle at the bottom right. */
     function minimize() {
+      /* The AI has no bubble: minimizing it simply closes it (open it again from the sparkle at the top). */
+      if (active === AI_USER) { close(AI_USER); return; }
       active = null;
       picking = false;
       save();
@@ -5239,6 +5253,7 @@
     const trackerPanel = h('div', { id: 'panel-tracker', role: 'tabpanel' }, tracker.el);
     function pickTab(name) {
       if (DASH_SOON.indexOf(name) !== -1) { toast('That section is coming soon.'); name = 'overview'; }
+      if (name === 'budget') { name = 'overview'; setTimeout(function () { budgetPanel.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 0); }
       state.dashTab = name;
       tabButtons.forEach(function (b, i) {
         const on = DASH_TABS[i][0] === name;
@@ -5246,7 +5261,7 @@
         b.tabIndex = on ? 0 : -1;
       });
       trackerPanel.hidden = name === 'budget' || name === 'overview';
-      budgetPanel.hidden = name !== 'budget';
+      budgetPanel.hidden = name !== 'overview' && name !== 'budget';
       overviewPanel.hidden = name !== 'overview';
       trackerPanel.setAttribute('aria-labelledby', 'tab-' + name);
       if (name !== 'budget' && name !== 'overview') tracker.setTab(name);
@@ -5257,6 +5272,8 @@
     budgetPanel.setAttribute('role', 'tabpanel');
     budgetPanel.setAttribute('aria-labelledby', 'tab-budget');
     budgetPanel.append(
+      h('div', { class: 'budget-head' }, h('h2', null, '50/30/20 budget rule'),
+        h('p', { class: 'small muted' }, 'Half for needs, 30% for wants, 20% for savings. Add your income and spending to see where you stand.')),
       h('section', { 'aria-label': 'Monthly summary' },
         h('div', { class: 'month-nav' },
           monthHeading,
@@ -5296,7 +5313,7 @@
 
   /* ---------- Savings tracker (bank accounts, wallets, credit cards, loans) ---------- */
 
-  const DASH_SOON = ['tracker', 'wallet', 'savings', 'credit', 'loan', 'budget'];
+  const DASH_SOON = ['tracker', 'wallet', 'savings', 'credit', 'loan'];
   const DASH_TABS = [['overview', 'Overview'], ['tracker', 'Savings tracker'], ['wallet', 'Wallet'], ['savings', 'Savings'], ['credit', 'Credit'], ['loan', 'Loan'], ['budget', '50/30/20']];
 
   function amountsHidden() { try { return localStorage.getItem('pbh.hideAmounts') === '1'; } catch (e) { return false; } }
