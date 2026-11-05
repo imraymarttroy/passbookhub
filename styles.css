@@ -2915,3 +2915,13 @@ a.th-name:hover { text-decoration: underline; }
 .ov-chip:active, .wn-chip-btn:active { transform: none !important; }
 .wn-overlay .wn-demo.wn-update { border: 0; padding: 0; background: none; }
 select.th-vis-select { height: 1.875rem; min-height: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+
+/* Dashboard health banner: flat, one even hairline border, no side stripe. */
+.ov-health { align-items: center; gap: 0.625rem; padding: 0.75rem 1rem; border: 1px solid var(--line) !important; border-radius: var(--r-lg); }
+.ov-health[data-state="warning"] { border-color: color-mix(in srgb, var(--warning) 45%, var(--line)) !important; }
+.ov-health[data-state="critical"] { border-color: color-mix(in srgb, var(--critical) 45%, var(--line)) !important; }
+.ov-health-icon { width: auto; height: auto; border-radius: 0; background: none; }
+.ov-health-icon svg { width: 1.125rem; height: 1.125rem; }
+.ov-health h2 { font-size: 0.9375rem; font-weight: 600; padding-top: 0; }
+.ov-health:has(.ov-health-list) { align-items: flex-start; }
+.ov-health:has(.ov-health-list) .ov-health-icon { margin-top: 0.125rem; }
