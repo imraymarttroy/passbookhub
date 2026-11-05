@@ -3028,7 +3028,7 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 .mo-row { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); }
 .mo-low { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
 .mo-card {
-  min-width: 0; padding: 1.25rem; border: 1px solid var(--line); border-radius: 10px;
+  min-width: 0; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--mo-r);
   background: transparent; box-shadow: none;
 }
 .mo-card-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.875rem; }
@@ -3039,6 +3039,7 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 .mo-empty { margin: 0; padding: 1.25rem 0; text-align: center; font-size: 0.8125rem; color: var(--ink-2); }
 .mo-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 2px; background: var(--ink); margin-right: 0.375rem; vertical-align: 0.05em; }
 
+.mo { --mo-r: 10px; }
 .mo-stack { display: flex; height: 0.625rem; border-radius: 999px; overflow: hidden; background: var(--wash); }
 .mo-stack i { display: block; height: 100%; background: var(--ink); }
 .mo-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin-top: 0.875rem; font-size: 0.8125rem; }
@@ -3091,7 +3092,7 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 /* Entries sheet: the 50/30/20 form and list, over the Overview */
 .entries-sheet {
   width: min(40rem, calc(100vw - 2rem)); max-height: calc(100dvh - 3rem); padding: 1.5rem;
-  border: 1px solid var(--line); border-radius: 14px; background: var(--page); color: var(--ink); box-shadow: none;
+  border: 1px solid var(--line); border-radius: var(--mo-r); background: var(--page); color: var(--ink); box-shadow: none;
 }
 .entries-sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
 .entries-sheet[open] { animation: sheet-in 0.2s ease-out; }
@@ -3107,13 +3108,13 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 /* ======================================================================
    Ask PassbookHub AI: tall side panel, slides in from the right
    ====================================================================== */
-:root { --ai-bg: #ffffff; --ai-w: 25rem; --ai-gap: 0.75rem; }
+:root { --ai-bg: #ffffff; --ai-w: 25rem; --ai-gap: 0.75rem; --mo-r: 10px; }
 :root[data-theme="dark"] { --ai-bg: #0f0f0f; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ai-bg: #0f0f0f; } }
 
 .chat-dock.ai-open .chat-pop {
   position: fixed; top: 4rem; right: var(--ai-gap); bottom: var(--ai-gap);
-  width: var(--ai-w); height: auto; border: 1px solid var(--line); border-radius: 16px;
+  width: var(--ai-w); height: auto; border: 1px solid var(--line); border-radius: var(--mo-r);
   background: var(--ai-bg); box-shadow: none;
   animation: ai-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
@@ -3141,7 +3142,7 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 
 .chat-dock.ai-open .ai-composer {
   align-items: center; gap: 0.5rem; padding: 0.375rem 0.375rem 0.375rem 1rem;
-  border: 1px solid var(--line-strong); border-radius: 1.5rem; transition: border-color 0.2s;
+  border: 1px solid var(--line-strong); border-radius: var(--mo-r); transition: border-color 0.2s;
 }
 .chat-dock.ai-open .ai-composer:focus-within { border-color: var(--ink-2); }
 .chat-dock.ai-open .ai-composer textarea { border: 0; background: transparent; box-shadow: none; outline: 0; padding: 0.375rem 0; min-height: 1.75rem; color: var(--ink); }
