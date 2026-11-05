@@ -62,6 +62,23 @@ service cloud.firestore {
           && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
       }
 
+      // users/{uid}/plan/budget: the Budget Plan (your split, salary, custom categories and limits).
+      // Only the owner writes it; the trusted person may read it so their view uses the same split.
+      match /plan/{planId} {
+        allow read: if signedInAs(uid) || trustedBy(uid);
+        allow delete: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && planId == 'budget'
+          && request.resource.data.keys().hasOnly(['shares', 'salaryCents', 'cats', 'updatedAt'])
+          && request.resource.data.shares is map
+          && request.resource.data.shares.keys().hasOnly(['needs', 'wants', 'savings'])
+          && request.resource.data.shares.needs is int && request.resource.data.shares.wants is int && request.resource.data.shares.savings is int
+          && request.resource.data.shares.needs >= 0 && request.resource.data.shares.wants >= 0 && request.resource.data.shares.savings >= 0
+          && request.resource.data.shares.needs + request.resource.data.shares.wants + request.resource.data.shares.savings == 100
+          && request.resource.data.salaryCents is int && request.resource.data.salaryCents >= 0 && request.resource.data.salaryCents <= 100000000000000
+          && request.resource.data.cats is list && request.resource.data.cats.size() <= 50
+          && request.resource.data.updatedAt is int;
+      }
+
       // users/{uid}/accounts/{id}: bank accounts, wallets, credit cards and loans (Savings tracker).
       // Same sharing as entries: the trusted person reads, and writes only with "Can edit".
       match /accounts/{accountId} {

@@ -54,6 +54,7 @@ window.BT = (function () {
 
   function userDoc(uid) { return F().doc(window.FB.db, 'users', uid); }
   function txCol(uid) { return F().collection(window.FB.db, 'users', uid, 'tx'); }
+  function planDoc(uid) { return F().doc(window.FB.db, 'users', uid, 'plan', 'budget'); }
   function nameDoc(username) { return F().doc(window.FB.db, 'usernames', username.toLowerCase()); }
   function emailDoc(email) { return F().doc(window.FB.db, 'emails', email.toLowerCase()); }
 
@@ -111,6 +112,7 @@ window.BT = (function () {
     cache.profile = null;
     cache.txs = [];
     cache.loadError = false;
+    plan = emptyPlan();
     if (!authUser) return;
     try {
       const snap = await F().getDoc(userDoc(authUser.uid));
@@ -120,6 +122,7 @@ window.BT = (function () {
       const list = await F().getDocs(txCol(authUser.uid));
       cache.txs = list.docs.map(function (d) { return Object.assign({}, d.data(), { id: d.id }); });
       watchOwnTx(authUser.uid);
+      await loadPlan(authUser.uid);
     } catch (error) {
       console.error(error);
       cache.loadError = true;
@@ -848,12 +851,104 @@ window.BT = (function () {
     });
   }
 
+  /* ---------- Budget plan: your own split, category caps and custom categories ---------- */
+
+  const DEFAULT_SHARES = { needs: 50, wants: 30, savings: 20 };
+  const PLAN_MAX_CATS = 50;
+  let plan = emptyPlan();
+  let planLocal = false;
+  const planListeners = [];
+
+  function emptyPlan() { return { shares: Object.assign({}, DEFAULT_SHARES), salaryCents: 0, cats: [] }; }
+  function planKey(uid) { return 'pbh.plan.' + uid; }
+
+  /** Keeps only well-formed values, so a bad record can never break the dashboard. */
+  function cleanPlan(raw) {
+    const out = emptyPlan();
+    if (!raw || typeof raw !== 'object') return out;
+    const s = raw.shares || {};
+    const n = Math.round(+s.needs), w = Math.round(+s.wants), v = Math.round(+s.savings);
+    if ([n, w, v].every(function (x) { return isFinite(x) && x >= 0 && x <= 100; }) && n + w + v === 100) out.shares = { needs: n, wants: w, savings: v };
+    if (Number.isInteger(raw.salaryCents) && raw.salaryCents > 0 && raw.salaryCents <= 100000000000000) out.salaryCents = raw.salaryCents;
+    const seen = {};
+    (Array.isArray(raw.cats) ? raw.cats : []).forEach(function (c) {
+      if (!c || typeof c.name !== 'string' || out.cats.length >= PLAN_MAX_CATS) return;
+      const name = c.name.trim().slice(0, 40);
+      const key = name.toLowerCase();
+      if (!name || seen[key] || ['needs', 'wants', 'savings', 'income'].indexOf(c.type) === -1) return;
+      seen[key] = true;
+      out.cats.push({
+        name: name, type: c.type,
+        icon: typeof c.icon === 'string' ? Array.from(c.icon).slice(0, 4).join('') : '',
+        cents: Number.isInteger(c.cents) && c.cents > 0 && c.cents <= 100000000000000 ? c.cents : 0
+      });
+    });
+    return out;
+  }
+
+  async function loadPlan(uid) {
+    plan = emptyPlan();
+    planLocal = false;
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem(planKey(uid)) || 'null'); } catch (e) { /* storage off */ }
+    try {
+      const snap = await F().getDoc(planDoc(uid));
+      if (snap.exists()) plan = cleanPlan(snap.data());
+      else if (local) { plan = cleanPlan(local); planLocal = true; }
+    } catch (error) {
+      /* Until the database rule for plans is live, the plan stays on this device. */
+      if (local) plan = cleanPlan(local);
+      planLocal = true;
+    }
+  }
+
+  function getPlan() { return JSON.parse(JSON.stringify(plan)); }
+  function planShares() { return Object.assign({}, plan.shares); }
+  function planIsLocal() { return planLocal; }
+  function onPlanChange(fn) { planListeners.push(fn); }
+
+  /** Saves the whole plan. Returns { local: true } when it could only be kept on this device. */
+  async function savePlan(next) {
+    const clean = cleanPlan(next);
+    const sum = clean.shares.needs + clean.shares.wants + clean.shares.savings;
+    if (sum !== 100) throw new UserError('Needs, wants and savings must add up to 100%.');
+    plan = clean;
+    try { localStorage.setItem(planKey(uid()), JSON.stringify(clean)); } catch (e) { /* storage off */ }
+    let local = false;
+    try {
+      await F().setDoc(planDoc(uid()), Object.assign({}, clean, { updatedAt: Date.now() }));
+      planLocal = false;
+    } catch (error) {
+      console.error(error);
+      local = planLocal = true;
+    }
+    planListeners.forEach(function (fn) { fn(); });
+    return { local: local };
+  }
+
+  /** Reads someone else's plan (your trusted person's view). Falls back to the default split. */
+  async function readPlan(ownerId) {
+    try {
+      const snap = await F().getDoc(planDoc(ownerId));
+      return snap.exists() ? cleanPlan(snap.data()) : emptyPlan();
+    } catch (e) { return emptyPlan(); }
+  }
+
+  /** Splits an amount by the shares. Savings takes the remainder so the parts always add up. */
+  function splitAmount(cents, shares) {
+    const s = shares || DEFAULT_SHARES;
+    const needs = Math.round(cents * s.needs / 100);
+    const wants = Math.round(cents * s.wants / 100);
+    return { needs: needs, wants: wants, savings: cents - needs - wants };
+  }
+
   /** Works in integer cents. Savings takes the remainder so the three targets always sum to income. */
-  function summarize(transactions) {
+  function summarize(transactions, shares) {
+    const s = shares || DEFAULT_SHARES;
     const totals = { income: 0, needs: 0, wants: 0, savings: 0 };
     transactions.forEach(function (t) { totals[t.type] += t.cents; });
-    const needsTarget = Math.round(totals.income * 0.5);
-    const wantsTarget = Math.round(totals.income * 0.3);
+    const needsTarget = Math.round(totals.income * s.needs / 100);
+    const wantsTarget = Math.round(totals.income * s.wants / 100);
     const targets = { needs: needsTarget, wants: wantsTarget, savings: totals.income - needsTarget - wantsTarget };
     const allocated = totals.needs + totals.wants + totals.savings;
     return {
@@ -861,7 +956,7 @@ window.BT = (function () {
       allocated: allocated,
       left: totals.income - allocated,
       buckets: BUCKETS.map(function (bucket) {
-        return Object.assign({}, bucket, { spent: totals[bucket.id], target: targets[bucket.id] });
+        return Object.assign({}, bucket, { share: s[bucket.id], spent: totals[bucket.id], target: targets[bucket.id] });
       })
     };
   }
@@ -916,6 +1011,8 @@ window.BT = (function () {
     validateSocialProfile: validateSocialProfile, completeSocialProfile: completeSocialProfile,
     sendVerification: sendVerification, refreshVerified: refreshVerified, sendPasswordReset: sendPasswordReset, lastEmailSent: lastEmailSent,
     onTxChange: onTxChange, listTx: listTx, addTx: addTx, updateTx: updateTx, deleteTx: deleteTx, restoreTx: restoreTx, monthTx: monthTx,
-    summarize: summarize, bucketStatus: bucketStatus, formatMoney: formatMoney, toCsv: toCsv
+    summarize: summarize, bucketStatus: bucketStatus, formatMoney: formatMoney, toCsv: toCsv,
+    DEFAULT_SHARES: DEFAULT_SHARES, PLAN_MAX_CATS: PLAN_MAX_CATS, getPlan: getPlan, planShares: planShares, planIsLocal: planIsLocal,
+    onPlanChange: onPlanChange, savePlan: savePlan, readPlan: readPlan, splitAmount: splitAmount
   };
 })();

@@ -5,7 +5,6 @@ window.OVERVIEW = (function () {
   'use strict';
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
-  const LIMIT_SHARE = 0.8; /* 50% needs + 30% wants: spending above this eats into savings. */
   const KIND_ICONS = {
     emergency: '<path d="M10 2.5 16.5 5v4.5c0 4-2.8 6.9-6.5 8-3.7-1.1-6.5-4-6.5-8V5z"/><path d="M10 7v5M7.5 9.5h5"/>',
     travel: '<path d="M2.5 11.5 17.5 5l-3 10-4-3.5-3 3v-4z"/><path d="m10.5 11.5 7-6.5"/>',
@@ -166,8 +165,9 @@ window.OVERVIEW = (function () {
         out.push({ level: 'warning', text: 'You have expenses but no income logged this month.' });
       } else if (inc > 0 && c.projected !== null && c.projected > inc) {
         out.push({ level: 'critical', text: 'At this pace, your expenses will pass your income by the end of the month.', amount: c.projected, amountLabel: 'projected' });
-      } else if (inc > 0 && exp >= inc * LIMIT_SHARE) {
-        out.push({ level: 'warning', text: 'Expenses are above 80% of your income, the 50/30/20 limit for needs and wants.' });
+      } else if (inc > 0 && exp >= inc * spendShare()) {
+        const sp = shares();
+        out.push({ level: 'warning', text: 'Expenses are above ' + (sp.needs + sp.wants) + '% of your income, the ' + sp.needs + '/' + sp.wants + '/' + sp.savings + ' limit for needs and wants.' });
       }
       if (r[8].expenses > 0 && r[8].expenses < r[9].expenses && r[9].expenses < r[10].expenses) {
         out.push({ level: 'warning', text: 'Your expenses went up three months in a row.' });
@@ -241,15 +241,17 @@ window.OVERVIEW = (function () {
       const inc = c.cur.income, exp = c.cur.expenses;
       const rate = inc > 0 ? Math.round(c.cur.savings / inc * 100) : null;
       const expShare = inc > 0 ? Math.round(exp / inc * 100) : null;
+      const goal = shares().savings;
+      const limitPct = Math.round(spendShare() * 100);
       kpiBox.replaceChildren(
         tile('Income this month', show(inc), change(inc, c.prevToDate.income, true), spark(last6.map(function (r) { return r.income; }), 's-income'), 'k-income'),
         tile('Expenses this month', show(exp), change(exp, c.prevToDate.expenses, false),
           h('div', { class: 'ov-kpi-row' }, spark(last6.map(function (r) { return r.expenses; }), 's-expense'),
-            expShare !== null ? h('span', { class: 'ov-pill', 'data-state': exp > inc ? 'critical' : expShare >= 80 ? 'warning' : 'good' }, h('span', { class: 'num' }, expShare + '%'), ' of income') : null), 'k-expense'),
+            expShare !== null ? h('span', { class: 'ov-pill', 'data-state': exp > inc ? 'critical' : expShare >= limitPct ? 'warning' : 'good' }, h('span', { class: 'num' }, expShare + '%'), ' of income') : null), 'k-expense'),
         tile('Savings rate', rate === null ? '—' : rate + '%',
-          h('p', { class: 'small muted' }, h('span', { class: 'num' }, show(c.cur.savings)), ' saved · goal 20%'),
-          h('div', { class: 'meter', 'data-state': rate !== null && rate >= 20 ? 'good' : 'normal', role: 'meter', 'aria-label': 'Savings rate', 'aria-valuemin': 0, 'aria-valuemax': 20, 'aria-valuenow': Math.max(0, Math.min(20, rate || 0)) },
-            h('i', { style: 'width:' + Math.max(0, Math.min(100, (rate || 0) / 20 * 100)) + '%' }))),
+          h('p', { class: 'small muted' }, h('span', { class: 'num' }, show(c.cur.savings)), ' saved · goal ' + goal + '%'),
+          h('div', { class: 'meter', 'data-state': rate !== null && rate >= goal ? 'good' : 'normal', role: 'meter', 'aria-label': 'Savings rate', 'aria-valuemin': 0, 'aria-valuemax': goal, 'aria-valuenow': Math.max(0, Math.min(goal, rate || 0)) },
+            h('i', { style: 'width:' + Math.max(0, Math.min(100, goal > 0 ? (rate || 0) / goal * 100 : 100)) + '%' }))),
         tile('Net worth', (c.netWorth < 0 && !hiddenAmounts() ? '−\u00a0' : '') + show(Math.abs(c.netWorth)),
           h('p', { class: 'small muted' }, 'Accounts + owed to you − debts')));
     }
@@ -319,7 +321,7 @@ window.OVERVIEW = (function () {
           s.appendChild(t);
         });
         /* limit line (80% of income) */
-        s.appendChild(svg('polyline', { points: rows.map(function (r, i) { return x(i) + ',' + y(r.income * LIMIT_SHARE); }).join(' '), class: 'ov-limit' }));
+        s.appendChild(svg('polyline', { points: rows.map(function (r, i) { return x(i) + ',' + y(r.income * spendShare()); }).join(' '), class: 'ov-limit' }));
         /* series */
         [['income', 's-income'], ['expenses', 's-expense']].forEach(function (sr) {
           const pts = rows.map(function (r, i) { return x(i).toFixed(1) + ',' + y(r[sr[0]]).toFixed(1); });
@@ -1273,7 +1275,16 @@ window.OVERVIEW = (function () {
 
     /* ---- Draw everything ---- */
     /* ---------- Minimalist overview ---------- */
-    const SPLIT = [['needs', 'Needs', 0.5, 1], ['wants', 'Wants', 0.3, 0.5], ['savings', 'Savings', 0.2, 0.22]];
+    /* The split comes from the Budget Plan (50/30/20 until you change it). */
+    function shares() { return (book.shares && book.shares()) || { needs: 50, wants: 30, savings: 20 }; }
+    let SPLIT = [];
+    function readSplit() {
+      const s = shares();
+      SPLIT = [['needs', 'Needs', s.needs / 100, 1], ['wants', 'Wants', s.wants / 100, 0.5], ['savings', 'Savings', s.savings / 100, 0.22]];
+      return s;
+    }
+    function spendShare() { const s = shares(); return (s.needs + s.wants) / 100; }
+    readSplit();
     function moCard(title, id, body, action) {
       return h('section', { class: 'mo-card', 'aria-labelledby': id },
         h('div', { class: 'mo-card-head' }, h('h3', { id: id, class: 'mo-label' }, title), action || null), body);
@@ -1303,7 +1314,7 @@ window.OVERVIEW = (function () {
         moCard('Safe-to-spend', 'mo-safe-h', h('div', null,
           h('p', { class: 'mo-big num' }, (left < 0 && !hiddenAmounts() ? '− ' : '') + show(Math.abs(left))),
           h('p', { class: 'mo-sub num' }, show(inc) + ' in · ' + show(exp) + ' out · ' + (rate === null ? '— saved' : rate + '% saved')))),
-        moCard('50/30/20 progress', 'mo-rule-h', h('div', null, stack,
+        moCard(SPLIT.map(function (x) { return Math.round(x[2] * 100); }).join('/') + ' progress', 'mo-rule-h', h('div', null, stack,
           h('div', { class: 'mo-legend' }, SPLIT.map(function (s) {
             return h('div', null,
               h('p', { class: 'mo-legend-name' }, moDot(s[3]), s[1], h('span', { class: 'mo-faint' }, ' ' + Math.round(s[2] * 100) + '%')),
@@ -1348,7 +1359,7 @@ window.OVERVIEW = (function () {
                 : ' / —'))),
             moBar(limit > 0 ? used / limit : 0, rest < 0 && limit > 0 ? 'over' : null));
         }),
-        h('p', { class: 'mo-note' }, 'Limits are 50/30/20 of this month’s income.')));
+        h('p', { class: 'mo-note' }, 'Limits are your ' + SPLIT.map(function (x) { return Math.round(x[2] * 100); }).join('/') + ' split of this month’s income. ', ctx.openTab ? h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openTab('plan'); } }, 'Edit plan') : null)));
       midBox.replaceChildren(donut, limits);
     }
 
@@ -1437,6 +1448,7 @@ window.OVERVIEW = (function () {
     ctx.onCleanup(function () { if (cashResizer) cashResizer.disconnect(); });
 
     function draw() {
+      readSplit();
       const c = compute();
       lastC = c;
       const monthEl = el.querySelector('#mo-month');
