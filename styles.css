@@ -3493,3 +3493,4 @@ body.auth-body .narrow, #app > .narrow {
 .su-switch-input:checked + .su-switch-ui { border-color: var(--ink); }
 .su-switch-input:checked + .su-switch-ui::after { transform: translateX(0.875rem); background: var(--ink); }
 .su-switch-input:focus-visible + .su-switch-ui { outline: 1px solid var(--ink-2); outline-offset: 2px; }
+.su-switch-ui::after { border-radius: 50% !important; }
