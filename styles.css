@@ -3438,3 +3438,5 @@ body.auth-body .narrow, #app > .narrow {
   .auth-center .auth-main { padding: 1.25rem 1rem; border: 0; }
   #app > .narrow { border: 0; margin-top: 1rem; }
 }
+.auth-center .btn:not(.primary):not(.social-btn) { background: transparent; border: 1px solid var(--line-strong); color: var(--ink); box-shadow: none; }
+.auth-center .btn:not(.primary):not(.social-btn):hover { background: var(--wash); }
