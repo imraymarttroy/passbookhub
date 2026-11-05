@@ -93,7 +93,14 @@ window.OVERVIEW = (function () {
     const goalBox = h('section', { class: 'ov-card ov-goals-card', 'aria-labelledby': 'ov-goal-h' });
     const stmtBox = h('section', { class: 'ov-card ov-stmt-card', 'aria-labelledby': 'ov-stmt-h' });
     const actBox = h('section', { class: 'ov-card ov-act-card', 'aria-labelledby': 'ov-act-h' });
-    el.append(healthBox, kpiBox, chartBox, h('div', { class: 'ov-split' }, recentBox, debtBox), goalBox, stmtBox, actBox);
+    /* Minimalist layout: what you can spend on top, where it goes in the middle, what happened and what is due below. */
+    const heroBox = h('div', { class: 'mo-row mo-top' });
+    const midBox = h('div', { class: 'mo-row mo-mid' });
+    const lowBox = h('div', { class: 'mo-row mo-low' });
+    const cashBox = h('section', { class: 'mo-card', 'aria-labelledby': 'mo-cash-h' });
+    el.className = 'ov mo';
+    el.append(h('div', { class: 'mo-head' }, h('h2', null, 'Overview'), h('p', { class: 'mo-sub', id: 'mo-month' })),
+      heroBox, midBox, lowBox, cashBox);
 
     /* ---- Live data ---- */
     const stops = [
@@ -108,7 +115,6 @@ window.OVERVIEW = (function () {
         function (list) { data.activity = list; data.actError = null; drawActivity(); },
         function (e) { data.activity = []; data.actError = e.message; drawActivity(); });
     }
-    watchAct();
     ctx.onCleanup(function () { stops.forEach(function (s) { s(); }); if (actStop) actStop(); if (resizer) resizer.disconnect(); });
 
     /* ---- Numbers ---- */
@@ -1266,17 +1272,179 @@ window.OVERVIEW = (function () {
     }
 
     /* ---- Draw everything ---- */
+    /* ---------- Minimalist overview ---------- */
+    const SPLIT = [['needs', 'Needs', 0.5, 1], ['wants', 'Wants', 0.3, 0.5], ['savings', 'Savings', 0.2, 0.22]];
+    function moCard(title, id, body, action) {
+      return h('section', { class: 'mo-card', 'aria-labelledby': id },
+        h('div', { class: 'mo-card-head' }, h('h3', { id: id, class: 'mo-label' }, title), action || null), body);
+    }
+    function moBar(share, cls) {
+      return h('div', { class: 'mo-bar' + (cls ? ' ' + cls : ''), role: 'presentation' },
+        h('i', { style: 'width:' + Math.max(0, Math.min(100, share * 100)).toFixed(1) + '%' }));
+    }
+    function moDot(opacity) { return h('span', { class: 'mo-dot', style: 'opacity:' + opacity, 'aria-hidden': 'true' }); }
+    function moEmpty(text) { return h('p', { class: 'mo-empty' }, text); }
+    function dayLabel(date, today) {
+      const d = daysBetween(date, today);
+      if (d === 0) return 'Today';
+      if (d === 1) return 'Yesterday';
+      return BT.shortDate(date);
+    }
+
+    function drawHero(c) {
+      const cur = c.cur, inc = cur.income, exp = cur.expenses;
+      const left = inc - exp;
+      const rate = inc > 0 ? Math.round(cur.savings / inc * 100) : null;
+      const stack = h('div', { class: 'mo-stack', role: 'img', 'aria-label': 'Needs, wants and savings as a share of income' },
+        SPLIT.map(function (s) {
+          return inc > 0 && cur[s[0]] > 0 ? h('i', { style: 'width:' + Math.min(100, cur[s[0]] / inc * 100).toFixed(1) + '%;opacity:' + s[3] }) : null;
+        }));
+      heroBox.replaceChildren(
+        moCard('Safe-to-spend', 'mo-safe-h', h('div', null,
+          h('p', { class: 'mo-big num' }, (left < 0 && !hiddenAmounts() ? '− ' : '') + show(Math.abs(left))),
+          h('p', { class: 'mo-sub num' }, show(inc) + ' in · ' + show(exp) + ' out · ' + (rate === null ? '— saved' : rate + '% saved')))),
+        moCard('50/30/20 progress', 'mo-rule-h', h('div', null, stack,
+          h('div', { class: 'mo-legend' }, SPLIT.map(function (s) {
+            return h('div', null,
+              h('p', { class: 'mo-legend-name' }, moDot(s[3]), s[1], h('span', { class: 'mo-faint' }, ' ' + Math.round(s[2] * 100) + '%')),
+              h('p', { class: 'num' }, show(cur[s[0]]), h('span', { class: 'mo-faint' }, ' / ' + (inc > 0 ? show(Math.round(inc * s[2])) : '—'))));
+          })),
+          inc > 0 ? null : h('p', { class: 'mo-note' }, 'Add your income to see your targets.'))));
+    }
+
+    function drawMid(c) {
+      const cur = c.cur, inc = cur.income;
+      const spent = cur.needs + cur.wants;
+      /* Donut: where this month's spending went. */
+      const r = 48, C = 2 * Math.PI * r;
+      const ring = svg('svg', { viewBox: '0 0 120 120', class: 'mo-donut', role: 'img', 'aria-label': 'Spending by category this month' });
+      ring.appendChild(svg('circle', { cx: 60, cy: 60, r: r, class: 'mo-donut-track' }));
+      const g = svg('g', { transform: 'rotate(-90 60 60)' });
+      let off = 0;
+      const parts = SPLIT.slice(0, 2).filter(function (s) { return cur[s[0]] > 0; });
+      parts.forEach(function (s) {
+        const len = cur[s[0]] / spent * C;
+        g.appendChild(svg('circle', { cx: 60, cy: 60, r: r, class: 'mo-donut-seg', 'stroke-opacity': s[3],
+          'stroke-dasharray': Math.max(0, len - (parts.length > 1 ? 1.5 : 0)).toFixed(2) + ' ' + C.toFixed(2), 'stroke-dashoffset': (-off).toFixed(2) }));
+        off += len;
+      });
+      ring.appendChild(g);
+      const mid = svg('text', { x: 60, y: 64, 'text-anchor': 'middle', class: 'mo-donut-total' });
+      mid.textContent = hiddenAmounts() ? '••••' : compact.format(spent / 100);
+      ring.appendChild(mid);
+      const donut = moCard('Spending breakdown', 'mo-donut-h', h('div', { class: 'mo-donut-wrap' }, ring,
+        spent > 0 ? h('div', { class: 'mo-legend-col' }, parts.map(function (s) {
+          return h('p', null, moDot(s[3]), s[1], h('span', { class: 'mo-faint num' }, ' ' + Math.round(cur[s[0]] / spent * 100) + '% · ' + show(cur[s[0]])));
+        })) : moEmpty('No spending yet this month.')));
+      /* Budget limits vs actual: 50/30/20 of income is the limit for each category. */
+      const limits = moCard('Budget limits vs actual', 'mo-limit-h', h('div', null,
+        SPLIT.map(function (s) {
+          const limit = Math.round(inc * s[2]), used = cur[s[0]];
+          const rest = limit - used;
+          return h('div', { class: 'mo-limit' },
+            h('div', { class: 'mo-limit-row' }, h('span', null, s[1]),
+              h('span', { class: 'num' }, show(used), h('span', { class: 'mo-faint' }, limit > 0
+                ? ' / ' + show(limit) + ' · ' + (rest >= 0 ? show(rest) + ' left' : show(-rest) + ' over')
+                : ' / —'))),
+            moBar(limit > 0 ? used / limit : 0, rest < 0 && limit > 0 ? 'over' : null));
+        }),
+        h('p', { class: 'mo-note' }, 'Limits are 50/30/20 of this month’s income.')));
+      midBox.replaceChildren(donut, limits);
+    }
+
+    function drawLow(c) {
+      const today = c.today;
+      const txs = book.list().slice().sort(function (a, b) { return a.date === b.date ? (b.createdAt || 0) - (a.createdAt || 0) : (a.date < b.date ? 1 : -1); }).slice(0, 8);
+      const recent = moCard('Recent activity', 'mo-recent-h',
+        txs.length ? h('ul', { class: 'mo-list' }, txs.map(function (t) {
+          const plus = t.type === 'income';
+          return h('li', null,
+            h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, t.desc || BT.TYPE_LABELS[t.type]),
+              h('span', { class: 'mo-faint' }, BT.TYPE_LABELS[t.type] + ' · ' + dayLabel(t.date, today))),
+            h('span', { class: 'num' }, (hiddenAmounts() ? '' : (plus ? '+' : '−')) + show(t.cents)));
+        })) : moEmpty('No transactions yet.'),
+        h('div', { class: 'mo-actions' },
+          book.canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { ctx.openTab('budget'); } }, '+ Add expense / income') : null,
+          h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openTab('entries'); } }, 'See all')));
+      /* Upcoming bills: debts you owe with a due date in the next 7 days (and any overdue). */
+      const debts = data.debts || [];
+      const leftOf = function (d) { return Math.max(0, d.cents - (d.paidCents || 0)); };
+      const due = debts.filter(function (d) {
+        if (d.dir !== 'owe' || !d.due || leftOf(d) <= 0) return false;
+        const n = daysBetween(today, d.due);
+        return n !== null && n <= 7;
+      }).sort(function (a, b) { return a.due < b.due ? -1 : 1; });
+      const when = function (d) {
+        const n = daysBetween(today, d.due);
+        if (n < 0) return 'overdue ' + (-n) + (n === -1 ? ' day' : ' days');
+        if (n === 0) return 'due today';
+        if (n === 1) return 'due tomorrow';
+        return 'due in ' + n + ' days';
+      };
+      const bills = moCard('Upcoming bills · 7 days', 'mo-bills-h',
+        data.debts === null ? moEmpty('Loading…')
+          : due.length ? h('ul', { class: 'mo-list' }, due.map(function (d) {
+            return h('li', null,
+              h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, d.note || d.person || 'Bill'), h('span', { class: 'mo-faint' }, when(d))),
+              h('span', { class: 'num' }, show(leftOf(d))));
+          })) : moEmpty('Nothing due in the next 7 days.'),
+        book.canEdit ? h('div', { class: 'mo-actions' }, h('button', { type: 'button', class: 'mo-link', onclick: function () { debtForm(null, 'owe'); } }, '+ Add a bill')) : null);
+      lowBox.replaceChildren(recent, bills);
+    }
+
+    /* Cashflow: income vs expenses for each month of this year so far. */
+    let cashResizer = null;
+    function drawCash(c) {
+      const year = c.month.slice(0, 4);
+      const months = [];
+      for (let m = 1; m <= +c.month.slice(5, 7); m++) months.push(year + '-' + String(m).padStart(2, '0'));
+      const rows = monthly(book.list(), months);
+      const plot = h('div', { class: 'mo-plot' });
+      const empty = rows.every(function (r) { return !r.income && !r.expenses; });
+      cashBox.replaceChildren(
+        h('div', { class: 'mo-card-head' }, h('h3', { id: 'mo-cash-h', class: 'mo-label' }, 'Cashflow · ' + shortMonth(months[0]) + '–' + shortMonth(months[months.length - 1]) + ' ' + year),
+          h('span', { class: 'mo-legend-inline' }, moDot(1), 'Income', moDot(0.3), 'Expenses')),
+        plot);
+      function paint() {
+        plot.replaceChildren();
+        const W = Math.max(280, plot.clientWidth), H = 150, base = H - 22;
+        const max = Math.max(1, Math.max.apply(null, rows.map(function (r) { return Math.max(r.income, r.expenses); })));
+        const gw = W / rows.length, bw = Math.min(14, gw / 3.2);
+        const s = svg('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, class: 'mo-bars', role: 'img', 'aria-label': 'Income and expenses by month' });
+        s.appendChild(svg('line', { x1: 0, x2: W, y1: base, y2: base, class: 'mo-axis' }));
+        rows.forEach(function (r, i) {
+          const cx = gw * i + gw / 2;
+          const hi = r.income / max * (base - 8), he = r.expenses / max * (base - 8);
+          const a = svg('rect', { x: (cx - bw - 1.5).toFixed(1), y: (base - hi).toFixed(1), width: bw.toFixed(1), height: hi.toFixed(1), rx: 2, class: 'mo-bar-in' });
+          const b = svg('rect', { x: (cx + 1.5).toFixed(1), y: (base - he).toFixed(1), width: bw.toFixed(1), height: he.toFixed(1), rx: 2, class: 'mo-bar-out' });
+          const ta = svg('title', {}); ta.textContent = shortMonth(r.month) + ' income ' + money(r.income); a.appendChild(ta);
+          const tb = svg('title', {}); tb.textContent = shortMonth(r.month) + ' expenses ' + money(r.expenses); b.appendChild(tb);
+          const lab = svg('text', { x: cx.toFixed(1), y: H - 4, 'text-anchor': 'middle', class: 'mo-tick' }); lab.textContent = shortMonth(r.month);
+          s.append(a, b, lab);
+        });
+        if (empty) {
+          const t = svg('text', { x: W / 2, y: base / 2, 'text-anchor': 'middle', class: 'mo-tick' }); t.textContent = 'No data yet';
+          s.appendChild(t);
+        }
+        plot.appendChild(s);
+      }
+      requestAnimationFrame(paint);
+      if (cashResizer) cashResizer.disconnect();
+      let lastW = 0;
+      cashResizer = new ResizeObserver(function () { if (Math.abs(plot.clientWidth - lastW) > 4) { lastW = plot.clientWidth; paint(); } });
+      cashResizer.observe(plot);
+    }
+    ctx.onCleanup(function () { if (cashResizer) cashResizer.disconnect(); });
+
     function draw() {
       const c = compute();
       lastC = c;
-      drawHealth(c);
-      drawKpis(c);
-      drawChart(c);
-      drawRecent();
-      drawDebts(c);
-      drawGoals(c);
-      drawStatement();
-      drawActivity();
+      const monthEl = el.querySelector('#mo-month');
+      if (monthEl) monthEl.textContent = BT.monthLabel(c.month);
+      drawHero(c);
+      drawMid(c);
+      drawLow(c);
+      drawCash(c);
     }
     draw();
     return { el: el, refresh: draw };

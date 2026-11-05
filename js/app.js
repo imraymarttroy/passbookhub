@@ -2101,6 +2101,17 @@
     return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
   }
 
+  /* Community: locked until there is content for it. */
+  function communityItem() {
+    const btn = h('button', {
+      type: 'button', class: 'nav-item locked', 'aria-disabled': 'true', title: 'Community is coming soon',
+      onclick: function () { toast('Community is coming soon.'); }
+    });
+    btn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="7" r="2.5"/><circle cx="13.5" cy="8" r="2"/><path d="M3 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12.5 12.2c1.9-.2 3.6.9 4.2 3.3"/></svg>';
+    btn.append(h('span', { class: 'nav-label' }, 'Community'), h('span', { class: 'nav-lock' }, icon('lock'), h('span', { class: 'vh' }, '(locked)')));
+    return h('li', null, btn);
+  }
+
   function shell(view, content) {
     const user = BT.currentUser();
     const current = view;
@@ -2115,7 +2126,7 @@
     }
     const aiBtn = h('button', {
       type: 'button', class: 'top-btn ai-top-btn', title: 'Ask PassbookHub AI', 'aria-label': 'Ask PassbookHub AI',
-      onclick: function () { dock.open(AI_USER); }
+      onclick: function () { dock.toggleAi(); }
     });
     aiBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">' + AI_SPARK + '</svg><span class="top-label">Ask PassbookHub AI</span>';
     const top = h('div', { class: 'top-actions' },
@@ -2150,6 +2161,7 @@
         h('ul', { class: 'nav-list' },
           dashboardChannel(current),
           item('feed', '#feed', 'Feed'),
+          communityItem(),
           h('li', null, h('button', {
             type: 'button',
             class: 'nav-item',
@@ -4433,9 +4445,8 @@
     function drawAll() {
       if (!history.length) {
         thread.replaceChildren(h('div', { class: 'chat-hint ai-hint' },
-          aiAvatar(3.5),
-          h('p', null, h('strong', null, 'Hi ' + me.name.split(' ')[0] + '! I’m PassbookHub AI.')),
-          h('p', { class: 'small muted' }, 'Ask me anything about budgeting, saving, debt or investing. I only answer money questions.'),
+          h('p', { class: 'ai-hello' }, 'Hello, ' + me.name.split(' ')[0]),
+          h('p', { class: 'ai-how' }, 'How can I help you?'),
           h('div', { class: 'ai-suggest' }, SUGGESTIONS.map(function (q) {
             return h('button', { type: 'button', class: 'ai-chip', onclick: function () { send(q); } }, q);
           }))));
@@ -4445,14 +4456,15 @@
       thread.scrollTop = thread.scrollHeight;
     }
 
-    const text = h('textarea', { id: 'f-ai', rows: 1, maxlength: 1000, placeholder: 'Ask a money question…', autocomplete: 'off' });
-    const sendBtn = h('button', { class: 'btn primary', type: 'submit' }, 'Send');
+    const text = h('textarea', { id: 'f-ai', rows: 1, maxlength: 1000, placeholder: 'Ask something', autocomplete: 'off' });
+    const sendBtn = h('button', { class: 'btn primary ai-send', type: 'submit', 'aria-label': 'Send', title: 'Send' });
+    sendBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M5 9l5-5 5 5"/></svg>';
     const grow = function () { text.style.height = 'auto'; text.style.height = Math.min(text.scrollHeight + 2, 120) + 'px'; };
     text.addEventListener('input', grow);
     text.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); form.requestSubmit(); }
     });
-    const form = h('form', { class: 'chat-composer', novalidate: true, onsubmit: function (event) { event.preventDefault(); send(text.value); } },
+    const form = h('form', { class: 'chat-composer ai-composer', novalidate: true, onsubmit: function (event) { event.preventDefault(); send(text.value); } },
       h('label', { class: 'vh', for: 'f-ai' }, 'Ask PassbookHub AI'), text, sendBtn);
 
     async function send(raw) {
@@ -4711,6 +4723,7 @@
       el.hidden = !shown;
       drawBubbles();
       mountPanel();
+      el.classList.toggle('ai-open', shown && active === AI_USER && !picking && !pop.hidden);
     }
 
     /** Opens (or brings back) the chat window for a username. */
@@ -4738,7 +4751,23 @@
       draw();
     }
 
+    /* The AI panel slides out to the right before it closes; the chat circles slide back with it. */
+    let aiClosing = null;
     function close(username) {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (username === AI_USER && active === AI_USER && el.classList.contains('ai-open') && !reduce) {
+        if (aiClosing) return;
+        el.classList.add('ai-closing');
+        aiClosing = setTimeout(function () { aiClosing = null; el.classList.remove('ai-closing'); reallyClose(username); }, 240);
+        return;
+      }
+      reallyClose(username);
+    }
+    function toggleAi() {
+      if (active === AI_USER && el.classList.contains('ai-open')) close(AI_USER);
+      else open(AI_USER);
+    }
+    function reallyClose(username) {
       items = items.filter(function (i) { return i.username.toLowerCase() !== username.toLowerCase(); });
       if (active && active.toLowerCase() === username.toLowerCase()) active = null;
       save();
@@ -4800,7 +4829,7 @@
       if (panel) panel.refresh();
     }
 
-    return { open: open, openPicker: openPicker, minimize: minimize, close: close, sync: sync, onChats: onChats };
+    return { open: open, openPicker: openPicker, minimize: minimize, close: close, toggleAi: toggleAi, sync: sync, onChats: onChats };
   })();
 
   /* Any "Message" link opens the floating chat instead of leaving the page. */
@@ -5249,9 +5278,23 @@
       }, t[1], soon ? h('span', { class: 'soon-tag' }, 'Soon') : null);
     });
     const trackerPanel = h('div', { id: 'panel-tracker', role: 'tabpanel' }, tracker.el);
+    /* The 50/30/20 form and the entries list live in a sheet that opens over the Overview. */
+    const sheetClose = h('button', { type: 'button', class: 'icon-btn entries-sheet-x', 'aria-label': 'Close', title: 'Close', onclick: function () { sheet.close(); } }, icon('close'));
+    const sheet = h('dialog', { class: 'entries-sheet', 'aria-label': 'Entries' }, sheetClose, budgetPanel);
+    sheet.addEventListener('click', function (e) { if (e.target === sheet) sheet.close(); });
+    sheet.addEventListener('close', function () { if (overview) overview.refresh(); });
+    form.addEventListener('submit', function () { setTimeout(function () { if (overview) overview.refresh(); }, 300); });
+    function openSheet(where) {
+      if (!sheet.open) { try { sheet.showModal(); } catch (e) { sheet.setAttribute('open', ''); } }
+      setTimeout(function () {
+        const target = where === 'entries' ? listBox : form;
+        if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+        if (where !== 'entries' && form.elements && form.elements.desc) form.elements.desc.focus({ preventScroll: true });
+      }, 0);
+    }
     function pickTab(name) {
       if (DASH_SOON.indexOf(name) !== -1) { toast('That section is coming soon.'); name = 'overview'; }
-      if (name === 'budget') { name = 'overview'; setTimeout(function () { budgetPanel.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 0); }
+      if (name === 'budget' || name === 'entries') { openSheet(name); name = 'overview'; }
       state.dashTab = name;
       tabButtons.forEach(function (b, i) {
         const on = DASH_TABS[i][0] === name;
@@ -5290,21 +5333,17 @@
     /* The dashboard always opens on the Overview. */
     pickTab('overview');
 
-    const trust = book.mine ? trustCard() : null;
+    /* Your own dashboard shows only the Overview. Someone else's still says whose budget it is. */
     return h('div', { class: 'wide' },
-      h('section', { class: 'identity' },
+      book.mine ? null : h('section', { class: 'identity' },
         idAvatar(user, book),
         h('div', null,
           h('h1', null, user.name),
           user.bio ? h('p', { class: 'small muted' }, user.bio) : null),
-        book.mine ? privatePin(trust) : sharedBadge(book)),
-      trust,
+        sharedBadge(book)),
       overviewPanel,
       trackerPanel,
-      budgetPanel,
-      h('p', { class: 'footnote' }, book.mine
-        ? 'Your data is saved to your account, so you can sign in from any device.'
-        : 'This is ' + user.name.split(' ')[0] + '\u2019s budget. Only ' + user.name.split(' ')[0] + ' and you can see it.'));
+      sheet);
   }
 
 
