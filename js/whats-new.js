@@ -15,21 +15,23 @@ window.WHATS_NEW = (function () {
    * Bump it with every release and update CHANGES below. A new version shows the tour once more,
    * even for people who ticked "Don't show this again".
    */
-  const APP_VERSION = '2.2.0';
+  const APP_VERSION = '2.3.0';
   /* The full tour on login only comes back when this changes; small updates use the minimal popup instead. */
   const FEATURES_VERSION = '2.0.0';
 
   /* What changed in APP_VERSION, shown in the minimal update popup (version button in the sidebar). */
   const UPDATE = {
     en: { title: 'What\u2019s new', close: 'Close', ok: 'Got it', items: [
-      ['Budget Plan', 'Set your own split instead of 50/30/20, add monthly limits like Dining Out, create categories with icons, and auto-split your salary. Dashboard › Budget Plan.'],
+      ['Budget & Transactions', 'One page for your split, salary auto-split, categories with icons and limits, spending charts, limits vs actuals, recent activity, bills, goals and every transaction.'],
+      ['Alert pop-ups', 'New alerts now pop up at the bottom right.'],
       ['New Overview', 'Safe-to-spend, 50/30/20 progress, budget limits, bills and cashflow on one screen.'],
       ['Quick add', 'Add an expense or income right from the Overview.'],
       ['Ask PassbookHub AI', 'A cleaner side panel that slides in from the right.'],
       ['Coming soon', 'Community and Blog are in the sidebar, locked for now.']
     ] },
     fil: { title: 'Ano ang bago', close: 'Isara', ok: 'Sige', items: [
-      ['Budget Plan', 'I-set ang sariling hatian bukod sa 50/30/20, maglagay ng buwanang limit gaya ng Dining Out, gumawa ng category na may icon, at i-auto-split ang sweldo. Dashboard › Budget Plan.'],
+      ['Budget & Transactions', 'Iisang page na para sa hatian mo, auto-split ng sweldo, mga category na may icon at limit, charts ng gastos, limits vs actual, recent, bayarin, goals at lahat ng transaction.'],
+      ['Alert pop-ups', 'Lumalabas na sa kanang ibaba ang mga bagong alert.'],
       ['Bagong Overview', 'Safe-to-spend, 50/30/20 progress, budget limits, bayarin at cashflow sa iisang screen.'],
       ['Quick add', 'Mag-add ng gastos o kita mula mismo sa Overview.'],
       ['Ask PassbookHub AI', 'Mas malinis na side panel na lumalabas mula sa kanan.'],

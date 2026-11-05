@@ -879,7 +879,7 @@ window.BT = (function () {
       seen[key] = true;
       out.cats.push({
         name: name, type: c.type,
-        icon: typeof c.icon === 'string' ? Array.from(c.icon).slice(0, 4).join('') : '',
+        icon: typeof c.icon === 'string' && /^[a-z0-9-]{1,24}$/.test(c.icon) ? c.icon : '',
         cents: Number.isInteger(c.cents) && c.cents > 0 && c.cents <= 100000000000000 ? c.cents : 0
       });
     });

@@ -268,14 +268,14 @@
     if (wanted === 'messages') return 'messages';
     if (wanted === 'notifications') return 'alerts';
     if (wanted === 'dashboard') return 'dashboard';
-    if (wanted === 'transactions') return 'transactions';
+    if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
     if (wanted === 'budget-plan') return 'budget-plan';
     /* After signing in (or with no page in the address), start on the profile. */
     return ['feed', 'profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'transactions', 'budget-plan', 'shared', 'feed', 'messages', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -285,8 +285,7 @@
     setup: { title: 'Set up your profile', render: viewSetup },
     secure: { title: 'Secure your account', render: viewSecure },
     dashboard: { title: 'Dashboard', render: viewDashboard },
-    transactions: { title: 'Transactions', render: viewDashboard },
-    'budget-plan': { title: 'Budget Plan', render: viewDashboard },
+    'budget-plan': { title: 'Budget & Transactions', render: viewDashboard },
     feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
     profile: { title: 'Profile', render: viewTimeline },
@@ -306,6 +305,7 @@
     /* The features pop-up belongs to the signed-in app only: never over sign in, sign up or setup. */
     if (SHELL_VIEWS.indexOf(view) === -1 && window.WHATS_NEW && WHATS_NEW.close) WHATS_NEW.close();
     if (SHELL_VIEWS.indexOf(view) === -1) calculator.close();
+    if (!BT.currentUser()) seenNotes = null;
     if (!BT.currentUser() && socialFor) { socialFor = null; SOC.stopWatching(); SOC.stopWatchingChats(); SOC.stopWatchingTrust(); SOC.stopPresence(); onlineCache = null; }
     if (state.cleanup) { state.cleanup(); state.cleanup = null; }
     state.onTrustChange = null;
@@ -2077,9 +2077,9 @@
   }
 
   /* Dashboard as a channel: click it and its sections open underneath. [view, label, locked] */
-  const DASH_CHANNEL = [['dashboard', 'Overview', false], ['transactions', 'Transactions', false], ['budget-plan', 'Budget Plan', false]];
+  const DASH_CHANNEL = [['dashboard', 'Overview', false], ['budget-plan', 'Budget & Transactions', false]];
   function dashboardChannel(current) {
-    const here = current === 'dashboard' || current === 'transactions' || current === 'budget-plan';
+    const here = current === 'dashboard' || current === 'budget-plan';
     let open = here;
     try { if (!open) open = localStorage.getItem('pbh.dashOpen') === '1'; } catch (e) { /* storage off */ }
     const sub = h('ul', { class: 'nav-sub', id: 'nav-sub-dashboard', hidden: !open },
@@ -5440,8 +5440,9 @@
       drawSummary(book.month(state.month));
       drawList();
       if (overview) overview.refresh();
-      if (ledger) ledger.draw();
-      if (planner && !planPanel.hidden) planner.draw();
+      if (plannerOv) plannerOv.refresh();
+      if (ledger && !planPanel.hidden) ledger.draw();
+      if (planner && !planPanel.hidden) { planner.draw(); drawPlanHead(); }
     }
 
     /* ---- Transactions: the full ledger, in the same minimalist cards as the Overview ---- */
@@ -5595,9 +5596,9 @@
             h('ul', { class: 'mo-list tl-list' }, g.items.map(function (tx) {
               const plus = tx.type === 'income';
               const label = tx.desc + ', ' + money(tx.cents);
-              const pc = planCat(book, tx.category);
-              const meta = [BT.TYPE_LABELS[tx.type], tx.category ? (pc && pc.icon ? pc.icon + ' ' : '') + tx.category : '', tx.method, BT.shortDate(tx.date)].filter(Boolean).join(' · ');
+              const meta = [BT.TYPE_LABELS[tx.type], tx.category, tx.method, BT.shortDate(tx.date)].filter(Boolean).join(' · ');
               return h('li', { class: 'tl-row' },
+                CAT_ICONS.tile(tx.category ? catIconKey(book, tx.category) : ({ income: 'coins', needs: 'home', wants: 'bag', savings: 'piggy' })[tx.type], 'sm'),
                 h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, tx.desc), h('span', { class: 'mo-faint' }, meta)),
                 h('span', { class: 'tl-right' },
                   book.canEdit ? h('span', { class: 'tl-tools' },
@@ -5694,7 +5695,8 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
 
-    let overview = null;
+    let overview = null;      /* the Overview page */
+    let plannerOv = null;     /* the charts, limits, bills and goals on the Budget page */
     let ledger = null;
     let planner = null;
     let planPanel = { hidden: true };
@@ -5703,18 +5705,35 @@
     drawHint();
     drawAll();
 
-    /* ---- Tabs: Overview, Savings tracker, Wallet, Savings, Credit, Loan, 50/30/20 ---- */
+    /* ---- Pages: Overview, and Budget & Transactions (your plan, charts, limits, bills, goals and the full ledger) ---- */
     const tracker = savingsTracker(book);
-    overview = OVERVIEW.render({
-      h: h, icon: icon, ask: ask, toast: toast, book: book,
-      onCleanup: function (fn) { const prev = state.cleanup; state.cleanup = function () { fn(); if (prev) prev(); }; },
-      openTab: function (name) { pickTab(name); const t = document.getElementById('tab-' + name); if (t) { t.focus(); t.scrollIntoView({ block: 'nearest' }); } }
-    });
-    const overviewPanel = h('div', { id: 'panel-overview', role: 'tabpanel', 'aria-labelledby': 'tab-overview' }, overview.el);
+    function ovCtx(mode) {
+      return {
+        h: h, icon: icon, ask: ask, toast: toast, book: book, mode: mode,
+        onCleanup: function (fn) { const prev = state.cleanup; state.cleanup = function () { fn(); if (prev) prev(); }; },
+        openTab: function (name) { pickTab(name); },
+        editCategory: function (name, type) { if (planner) planner.editCategory(name, type); }
+      };
+    }
+    const overviewPanel = h('div', { id: 'panel-overview', role: 'tabpanel', 'aria-labelledby': 'tab-overview', hidden: true });
     ledger = transactionsLedger();
-    const ledgerPanel = h('div', { id: 'panel-transactions', role: 'tabpanel', 'aria-labelledby': 'tab-transactions' }, ledger.el);
     planner = budgetPlan({ book: book, money: money });
-    planPanel = h('div', { id: 'panel-plan', role: 'tabpanel', 'aria-labelledby': 'tab-plan', hidden: true }, planner.el);
+    const planSub = h('p', { class: 'mo-sub' });
+    const planBody = h('div', { class: 'mo bp-page' },
+      h('div', { class: 'mo-head' }, h('h2', null, 'Budget & Transactions'), planSub),
+      planner.el);
+    planPanel = h('div', { id: 'panel-plan', role: 'tabpanel', 'aria-labelledby': 'tab-plan', hidden: true }, planBody);
+    function drawPlanHead() {
+      const m = BT.monthOf(BT.today());
+      const inc = book.month(m).reduce(function (t, x) { return t + (x.type === 'income' ? x.cents : 0); }, 0);
+      const sal = bookPlan(book).salaryCents;
+      const parts = [BT.monthLabel(m)];
+      if (inc > 0) parts.push('targets from ' + money(inc) + ' logged income');
+      else if (sal > 0) parts.push('targets from your ' + money(sal) + ' salary');
+      else parts.push('log income or enter your salary to see targets');
+      planSub.replaceChildren(parts.join(' · '), book.mine && BT.planIsLocal() ? h('span', { class: 'bp-local' }, ' · plan saved on this device only') : '');
+    }
+    function refreshOv() { if (overview) overview.refresh(); if (plannerOv) plannerOv.refresh(); }
     const budgetPanel = h('div', { class: 'budget-panel' });
     /* For now only the Overview is open; the other sections show as "Soon". */
     const tabButtons = DASH_TABS.map(function (t) {
@@ -5731,8 +5750,8 @@
     const sheetClose = h('button', { type: 'button', class: 'icon-btn entries-sheet-x', 'aria-label': 'Close', title: 'Close', onclick: function () { sheet.close(); } }, icon('close'));
     const sheet = h('dialog', { class: 'entries-sheet', 'aria-label': 'Entries' }, sheetClose, budgetPanel);
     sheet.addEventListener('click', function (e) { if (e.target === sheet) sheet.close(); });
-    sheet.addEventListener('close', function () { if (overview) overview.refresh(); });
-    form.addEventListener('submit', function () { setTimeout(function () { if (overview) overview.refresh(); }, 300); });
+    sheet.addEventListener('close', refreshOv);
+    form.addEventListener('submit', function () { setTimeout(refreshOv, 300); });
     function openSheet(where) {
       if (!sheet.open) { try { sheet.showModal(); } catch (e) { sheet.setAttribute('open', ''); } }
       setTimeout(function () {
@@ -5743,35 +5762,50 @@
     }
     function pickTab(name) {
       if (DASH_SOON.indexOf(name) !== -1) { toast('That section is coming soon.'); name = 'overview'; }
-      if (name === 'budget' || name === 'entries') { openSheet(name); name = 'overview'; }
-      /* Transactions has its own address so the sidebar can link to it. */
-      if (name === 'transactions' && state.view !== 'transactions') { location.hash = '#transactions'; return; }
-      if (name === 'plan' && state.view !== 'budget-plan') { location.hash = '#budget-plan'; return; }
-      if (name === 'overview' && (state.view === 'transactions' || state.view === 'budget-plan')) { location.hash = '#dashboard'; return; }
+      if (name === 'budget' || name === 'entries') { openSheet(name); return; }
+      const jump = name === 'transactions' ? 'ledger' : null;
+      if (name === 'transactions') name = 'plan';
+      /* Your Budget page has its own address so the sidebar can link to it. */
+      if (book.mine && name === 'plan' && state.view !== 'budget-plan') { state.jump = jump; location.hash = '#budget-plan'; return; }
+      if (book.mine && name === 'overview' && state.view === 'budget-plan') { location.hash = '#dashboard'; return; }
       state.dashTab = name;
       tabButtons.forEach(function (b, i) {
         const on = DASH_TABS[i][0] === name;
         b.setAttribute('aria-selected', on ? 'true' : 'false');
         b.tabIndex = on ? 0 : -1;
       });
-      trackerPanel.hidden = name === 'budget' || name === 'overview' || name === 'transactions' || name === 'plan';
-      budgetPanel.hidden = name !== 'overview' && name !== 'budget' && name !== 'transactions' && name !== 'plan';
+      if (name === 'overview' && !overview) {
+        overview = OVERVIEW.render(ovCtx('overview'));
+        overviewPanel.appendChild(overview.el);
+      }
+      if (name === 'plan' && !plannerOv) {
+        plannerOv = OVERVIEW.render(ovCtx('planner'));
+        planBody.append(plannerOv.el, h('div', { id: 'bp-ledger', class: 'bp-ledger' }, ledger.el));
+      }
+      trackerPanel.hidden = true;
       overviewPanel.hidden = name !== 'overview';
-      ledgerPanel.hidden = name !== 'transactions';
       planPanel.hidden = name !== 'plan';
-      if (name === 'transactions') ledger.draw();
-      if (name === 'plan') planner.draw();
-      trackerPanel.setAttribute('aria-labelledby', 'tab-' + name);
-      if (name !== 'budget' && name !== 'overview' && name !== 'transactions' && name !== 'plan') tracker.setTab(name);
+      dashSwitch.forEach(function (b) { b.setAttribute('aria-current', b.dataset.tab === name ? 'page' : 'false'); });
+      if (name === 'plan') { planner.draw(); drawPlanHead(); ledger.draw(); }
+      if (name === 'plan' && (jump || state.jump)) {
+        state.jump = null;
+        setTimeout(function () { const t = document.getElementById('bp-ledger'); if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
+      }
     }
+    /* On phones there is no sidebar: a small switch moves between the two pages. */
+    const dashSwitch = [['overview', 'Overview'], ['plan', 'Budget & Transactions']].map(function (t) {
+      const b = h('button', { type: 'button', class: 'dash-switch-btn', onclick: function () { pickTab(t[0]); } }, t[1]);
+      b.dataset.tab = t[0];
+      return b;
+    });
     tracker.onTab = function (name) { if (state.dashTab !== name) pickTab(name); };
 
     budgetPanel.id = 'panel-budget';
     budgetPanel.setAttribute('role', 'tabpanel');
     budgetPanel.setAttribute('aria-labelledby', 'tab-budget');
     budgetPanel.append(
-      h('div', { class: 'budget-head' }, h('h2', null, '50/30/20 budget rule'),
-        h('p', { class: 'small muted' }, 'Half for needs, 30% for wants, 20% for savings. Add your income and spending to see where you stand.')),
+      h('div', { class: 'budget-head' }, h('h2', null, 'Income & spending'),
+        h('p', { class: 'small muted' }, 'Add an entry and see how this month stands against your split. Change the split on the Budget & Transactions page.')),
       h('section', { 'aria-label': 'Monthly summary' },
         h('div', { class: 'month-nav' },
           monthHeading,
@@ -5788,7 +5822,7 @@
             filter)),
         listBox));
     /* #dashboard opens on the Overview; #transactions opens the full ledger. */
-    pickTab(_ === 'transactions' ? 'transactions' : _ === 'budget-plan' ? 'plan' : 'overview');
+    pickTab(_ === 'budget-plan' ? 'plan' : 'overview');
 
     /* Your own dashboard shows only the Overview. Someone else's still says whose budget it is. */
     return h('div', { class: 'wide' },
@@ -5798,8 +5832,8 @@
           h('h1', null, user.name),
           user.bio ? h('p', { class: 'small muted' }, user.bio) : null),
         sharedBadge(book)),
+      h('nav', { class: 'dash-switch', 'aria-label': 'Dashboard pages' }, dashSwitch),
       overviewPanel,
-      ledgerPanel,
       planPanel,
       trackerPanel,
       sheet);
@@ -5807,12 +5841,11 @@
 
 
 
-  /* ---------- Budget Plan: your split, category limits, custom categories and the salary calculator ---------- */
+  /* ---------- Budget: your split, the salary calculator and your categories (one page with Transactions) ---------- */
 
   const PLAN_PRESETS = [[50, 30, 20], [60, 20, 20], [70, 20, 10], [40, 30, 30]];
-  const PLAN_ICONS = ['🍔', '🍽️', '☕', '🛒', '🏠', '💡', '💧', '🚌', '⛽', '📱', '🌐', '💊', '🛡️', '🎓', '💳', '🧾',
-    '🛍️', '🎬', '🎮', '✈️', '🎁', '💇', '🐶', '👶', '💰', '📈', '🏦', '🎯', '❤️', '⭐', '📦', '🧰'];
   const PLAN_TYPES = [['needs', 'Needs'], ['wants', 'Wants'], ['savings', 'Savings'], ['income', 'Income']];
+  const PLAN_SHADES = [1, 0.55, 0.25];
 
   /** The plan of whoever owns this book: yours, or the shared owner's once it has loaded. */
   function bookPlan(book) {
@@ -5822,38 +5855,43 @@
   /** The custom category with this name, if the plan has one. */
   function planCat(book, name) {
     if (!name) return null;
-    const key = String(name).toLowerCase();
+    const key = String(name).trim().toLowerCase();
     return bookPlan(book).cats.find(function (c) { return c.name.toLowerCase() === key; }) || null;
+  }
+  /** The icon key for a category name: the one you picked, or a good guess. */
+  function catIconKey(book, name) {
+    const c = planCat(book, name);
+    return c && c.icon ? c.icon : CAT_ICONS.guess(name);
   }
 
   /**
-   * The Budget Plan page. ctx: { book, money, month() }.
-   * Returns { el, draw() }.
+   * The top of the Budget page. ctx: { book, money }.
+   * Returns { el, draw(), editCategory(name, type) }.
    */
   function budgetPlan(ctx) {
     const book = ctx.book;
     const money = ctx.money;
     const canEdit = !!book.mine;
-    const el = h('div', { class: 'tl mo bp' });
+    const el = h('div', { class: 'bp' });
     let draft = null;          /* shares being edited, before Save */
-    let editing = null;        /* category being edited (its old name), or '' for a new one */
+    let editing = null;        /* name of the category being edited; '' for a new one; null when the form is closed */
     let pickedIcon = '';
-    let calcCents = null;      /* what's typed in the calculator; null = follow the plan */
+    let pickedType = 'wants';
+    let calcCents = null;      /* what's typed in the calculator; null = follow the saved salary */
 
     function plan() { return bookPlan(book); }
     function shares() { return draft || plan().shares; }
     function sameShares(a, b) { return a.needs === b.needs && a.wants === b.wants && a.savings === b.savings; }
+    function thisMonth() { return BT.monthOf(BT.today()); }
     function monthIncome() {
-      return book.month(BT.monthOf(BT.today())).reduce(function (t, x) { return t + (x.type === 'income' ? x.cents : 0); }, 0);
+      return book.month(thisMonth()).reduce(function (t, x) { return t + (x.type === 'income' ? x.cents : 0); }, 0);
     }
-    /* Targets come from this month's logged income; before any income is logged, from your saved salary. */
-    function base() { const inc = monthIncome(); return inc > 0 ? { cents: inc, from: 'income' } : { cents: plan().salaryCents, from: 'salary' }; }
-    function toCents(raw) { const c = Math.round(parseFloat(raw) * 100); return isFinite(c) && c > 0 ? c : 0; }
+    function toCents(raw) { const c = Math.round(parseFloat(raw) * 100); return isFinite(c) && c > 0 ? Math.min(c, 100000000000000) : 0; }
 
     async function save(next, done) {
       try {
         const r = await BT.savePlan(next);
-        toast(r.local ? (done || 'Saved') + ' on this device. It will sync once the database is updated.' : (done || 'Budget plan saved') + '.');
+        toast(r.local ? done + ' on this device for now.' : done + '.');
         return true;
       } catch (error) {
         toast(error instanceof BT.UserError ? error.message : 'We could not save your plan.');
@@ -5861,148 +5899,169 @@
       }
     }
 
-    const sub = h('p', { class: 'mo-sub' });
-    const splitCard = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-split-h' });
-    const calcCard = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-calc-h' });
-    const catsCard = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-cats-h' });
-    el.append(h('div', { class: 'mo-head' }, h('h2', null, 'Budget Plan'), sub),
-      h('div', { class: 'mo-row bp-top' }, splitCard, calcCard), catsCard);
+    const splitCard = h('section', { class: 'mo-card bp-card', 'aria-labelledby': 'bp-split-h' });
+    const calcCard = h('section', { class: 'mo-card bp-card', 'aria-labelledby': 'bp-calc-h' });
+    const catsCard = h('section', { class: 'mo-card bp-card', 'aria-labelledby': 'bp-cats-h' });
+    el.append(h('div', { class: 'mo-row bp-top' }, splitCard, calcCard), catsCard);
+
+    function cardHead(id, title, right) {
+      return h('div', { class: 'mo-card-head' }, h('h3', { id: id, class: 'mo-label' }, title), h('span', { class: 'bp-head-tools' }, right));
+    }
 
     /* ---- Your split ---- */
     const inputs = {};
-    function shareInput(id, label) {
+    const splitCols = PLAN_TYPES.slice(0, 3).map(function (t, i) {
       const input = h('input', {
-        type: 'number', class: 'bp-pct-in num', min: '0', max: '100', step: '1', inputmode: 'numeric', 'aria-label': label + ' percent',
+        type: 'number', class: 'bp-pct-in num', min: '0', max: '100', step: '1', inputmode: 'numeric', 'aria-label': t[1] + ' percent',
         disabled: !canEdit,
         oninput: function () {
           const v = Math.round(+input.value);
           draft = Object.assign({}, shares());
-          draft[id] = isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
+          draft[t[0]] = isFinite(v) ? Math.max(0, Math.min(100, v)) : 0;
+          fit(input);
           drawSplit(true);
+          drawCalcBody();
         }
       });
-      inputs[id] = input;
-      return input;
-    }
-    const splitInputs = PLAN_TYPES.slice(0, 3).map(function (t) {
-      return h('label', { class: 'bp-pct' }, h('span', { class: 'mo-label' }, t[1]), h('span', { class: 'bp-pct-box' }, shareInput(t[0], t[1]), h('span', { class: 'mo-faint' }, '%')));
+      inputs[t[0]] = input;
+      return h('label', { class: 'bp-pct' },
+        h('span', { class: 'bp-pct-name' }, h('span', { class: 'mo-dot', style: 'opacity:' + PLAN_SHADES[i] }), t[1]),
+        h('span', { class: 'bp-pct-box' }, input, h('span', { class: 'bp-pct-sign' }, '%')));
     });
+    function fit(input) { input.style.width = (Math.max(1, String(input.value).length) + 0.35) + 'ch'; }
     const splitBar = h('div', { class: 'mo-stack bp-stack', role: 'img' });
-    const splitTotal = h('p', { class: 'mo-note num' });
-    const presetRow = h('div', { class: 'tl-pills' });
+    const splitTotal = h('span', { class: 'bp-total num' });
+    const presetRow = h('div', { class: 'bp-seg', role: 'group', 'aria-label': 'Quick picks' });
     const saveSplit = h('button', { type: 'button', class: 'mo-btn', onclick: function () {
       const s = shares();
       if (s.needs + s.wants + s.savings !== 100) return;
       const next = plan(); next.shares = s;
       save(next, 'Split saved').then(function (ok) { if (ok) { draft = null; drawAll(); } });
-    } }, 'Save split');
-    const undoSplit = h('button', { type: 'button', class: 'mo-link', onclick: function () { draft = null; drawSplit(); drawCalc(); } }, 'Undo');
+    } }, 'Save');
+    const undoSplit = h('button', { type: 'button', class: 'mo-link', onclick: function () { draft = null; drawSplit(); drawCalcBody(); } }, 'Undo');
 
     function drawSplit(fromTyping) {
       const s = shares();
-      if (!fromTyping) PLAN_TYPES.slice(0, 3).forEach(function (t) { inputs[t[0]].value = s[t[0]]; });
+      if (!fromTyping) PLAN_TYPES.slice(0, 3).forEach(function (t) { inputs[t[0]].value = s[t[0]]; fit(inputs[t[0]]); });
       const total = s.needs + s.wants + s.savings;
       splitBar.setAttribute('aria-label', 'Needs ' + s.needs + '%, wants ' + s.wants + '%, savings ' + s.savings + '%');
-      splitBar.replaceChildren(h('i', { style: 'width:' + Math.min(100, s.needs) + '%;opacity:1' }), h('i', { style: 'width:' + Math.min(100, s.wants) + '%;opacity:0.5' }), h('i', { style: 'width:' + Math.min(100, s.savings) + '%;opacity:0.22' }));
-      splitTotal.textContent = total === 100 ? 'Total 100%' : 'Total ' + total + '% · ' + (total < 100 ? 'add ' + (100 - total) + '%' : 'remove ' + (total - 100) + '%') + ' to save';
+      splitBar.replaceChildren.apply(splitBar, PLAN_TYPES.slice(0, 3).map(function (t, i) {
+        return h('i', { style: 'width:' + Math.min(100, s[t[0]]) + '%;opacity:' + PLAN_SHADES[i] });
+      }));
+      splitTotal.textContent = total === 100 ? 'Total 100%' : 'Total ' + total + '% · ' + (total < 100 ? 'add ' + (100 - total) : 'remove ' + (total - 100)) + '%';
       splitTotal.classList.toggle('bp-bad', total !== 100);
       const changed = !!draft && !sameShares(draft, plan().shares);
       saveSplit.disabled = !changed || total !== 100;
       saveSplit.hidden = undoSplit.hidden = !canEdit || !changed;
       presetRow.replaceChildren.apply(presetRow, PLAN_PRESETS.map(function (p) {
         const on = s.needs === p[0] && s.wants === p[1] && s.savings === p[2];
-        return h('button', { type: 'button', class: 'tl-pill bp-preset' + (on ? ' on' : ''), disabled: !canEdit, 'aria-pressed': on ? 'true' : 'false',
-          onclick: function () { draft = { needs: p[0], wants: p[1], savings: p[2] }; drawSplit(); drawCalc(); } }, p.join('/'));
+        return h('button', { type: 'button', class: 'bp-seg-btn num' + (on ? ' on' : ''), disabled: !canEdit, 'aria-pressed': on ? 'true' : 'false',
+          onclick: function () { draft = { needs: p[0], wants: p[1], savings: p[2] }; drawSplit(); drawCalcBody(); } }, p.join('/'));
       }));
-      if (fromTyping) drawCalc();
     }
     splitCard.append(
-      h('div', { class: 'mo-card-head' }, h('h3', { id: 'bp-split-h', class: 'mo-label' }, 'Your split'), h('span', { class: 'bp-head-tools' }, undoSplit, saveSplit)),
-      h('div', { class: 'bp-pcts' }, splitInputs), splitBar, splitTotal,
-      h('p', { class: 'mo-faint small bp-gap' }, 'Quick picks'), presetRow);
+      cardHead('bp-split-h', 'Your split', [undoSplit, saveSplit]),
+      h('div', { class: 'bp-pcts' }, splitCols),
+      splitBar,
+      h('div', { class: 'bp-split-foot' }, presetRow, splitTotal));
 
-    /* ---- Auto-split calculator ---- */
+    /* ---- Salary auto-split ---- */
     const salaryIn = h('input', {
-      type: 'number', class: 'tl-search num', min: '0', step: '0.01', inputmode: 'decimal', placeholder: '0.00', 'aria-label': 'Monthly salary (' + book.currency + ')',
+      type: 'number', class: 'bp-salary-in num', min: '0', step: '0.01', inputmode: 'decimal', placeholder: '0.00', 'aria-label': 'Monthly salary (' + book.currency + ')',
+      disabled: !canEdit,
       oninput: function () { calcCents = toCents(salaryIn.value); drawCalcBody(); }
     });
-    const calcBody = h('div');
+    const calcBody = h('div', { class: 'bp-calc-body' });
     const saveSalary = h('button', { type: 'button', class: 'mo-btn', onclick: function () {
       const next = plan(); next.salaryCents = calcCents || 0;
       save(next, next.salaryCents ? 'Salary saved' : 'Salary cleared').then(function (ok) { if (ok) { calcCents = null; drawAll(); } });
-    } }, 'Save salary');
+    } }, 'Save');
     function drawCalc() {
       if (calcCents === null) { const p = plan().salaryCents; salaryIn.value = p ? (p / 100).toFixed(2) : ''; }
       drawCalcBody();
     }
     function drawCalcBody() {
       const cents = calcCents === null ? plan().salaryCents : calcCents;
-      const parts = BT.splitAmount(cents, shares());
       const s = shares();
+      const parts = BT.splitAmount(cents, s);
       saveSalary.hidden = !canEdit || calcCents === null || calcCents === plan().salaryCents;
       const inc = monthIncome();
       calcBody.replaceChildren(
-        h('ul', { class: 'mo-list bp-split-list' }, PLAN_TYPES.slice(0, 3).map(function (t, i) {
-          return h('li', null,
-            h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, h('span', { class: 'mo-dot', style: 'opacity:' + [1, 0.5, 0.22][i], 'aria-hidden': 'true' }), t[1]),
-              h('span', { class: 'mo-faint' }, s[t[0]] + '% of salary')),
+        h('ul', { class: 'bp-rows' }, PLAN_TYPES.slice(0, 3).map(function (t, i) {
+          return h('li', { class: 'bp-calc-row' },
+            h('span', { class: 'bp-pct-name' }, h('span', { class: 'mo-dot', style: 'opacity:' + PLAN_SHADES[i] }), t[1]),
+            h('span', { class: 'mo-faint num' }, s[t[0]] + '%'),
             h('span', { class: 'num bp-amt' }, cents ? money(parts[t[0]]) : '—'));
         })),
         h('p', { class: 'mo-note' }, inc > 0
-          ? 'This month your targets use the ' + money(inc) + ' income you logged. Your salary is the fallback before income is logged.'
-          : 'Until you log income this month, your targets use this salary.'));
+          ? 'Your ' + money(inc) + ' logged income sets this month’s targets. Salary is used before income is logged.'
+          : 'No income logged this month yet, so your targets use this salary.'));
     }
     calcCard.append(
-      h('div', { class: 'mo-card-head' }, h('h3', { id: 'bp-calc-h', class: 'mo-label' }, 'Auto-split calculator'), saveSalary),
-      h('label', { class: 'tl-search-wrap' }, h('span', { class: 'mo-faint small' }, book.currency), salaryIn),
+      cardHead('bp-calc-h', 'Salary auto-split', saveSalary),
+      h('label', { class: 'bp-salary' }, h('span', { class: 'bp-cur' }, book.currency), salaryIn),
       calcBody);
 
-    /* ---- Category limits and custom categories ---- */
-    const catForm = h('form', { class: 'bp-form', novalidate: true, hidden: true, onsubmit: function (e) { e.preventDefault(); saveCat(); } });
-    const nameIn = h('input', { type: 'text', class: 'tl-search', maxlength: 40, autocomplete: 'off', placeholder: 'e.g. Dining Out', 'aria-label': 'Category name', list: 'bp-cat-sugg' });
+    /* ---- Categories: create, edit, icon and monthly limit ---- */
+    const nameIn = h('input', { type: 'text', class: 'bp-text', maxlength: 40, autocomplete: 'off', placeholder: 'e.g. Dining Out', 'aria-label': 'Category name', list: 'bp-cat-sugg',
+      oninput: function () { if (!pickedIcon) drawIcons(); } });
     const sugg = h('datalist', { id: 'bp-cat-sugg' });
-    const typeSel = h('select', { class: 'tl-pill on', 'aria-label': 'Budget group', onchange: drawSugg }, PLAN_TYPES.map(function (t) { return h('option', { value: t[0] }, t[1]); }));
-    const capIn = h('input', { type: 'number', class: 'tl-search num', min: '0', step: '0.01', inputmode: 'decimal', placeholder: 'No limit', 'aria-label': 'Monthly limit (' + book.currency + ')' });
-    const iconRow = h('div', { class: 'bp-icons', role: 'radiogroup', 'aria-label': 'Icon' });
-    const formErr = h('p', { class: 'bp-err small', role: 'alert', hidden: true });
+    const typeSeg = h('div', { class: 'bp-seg', role: 'radiogroup', 'aria-label': 'Budget group' });
+    const capIn = h('input', { type: 'number', class: 'bp-text num', min: '0', step: '0.01', inputmode: 'decimal', placeholder: 'No limit', 'aria-label': 'Monthly limit (' + book.currency + ')' });
+    const iconGrid = h('div', { class: 'bp-icons', role: 'radiogroup', 'aria-label': 'Icon' });
+    const formErr = h('p', { class: 'bp-err', role: 'alert', hidden: true });
     const formTitle = h('h3', { class: 'mo-label' });
-    const delBtn = h('button', { type: 'button', class: 'mo-link', onclick: function () { if (editing) removeCat(editing); } }, 'Delete');
+    const delBtn = h('button', { type: 'button', class: 'mo-link bp-del', onclick: function () { if (editing) removeCat(editing); } }, 'Delete category');
+    const catForm = h('form', { class: 'bp-form', novalidate: true, hidden: true, onsubmit: function (e) { e.preventDefault(); saveCat(); } });
+
+    function drawTypes() {
+      typeSeg.replaceChildren.apply(typeSeg, PLAN_TYPES.map(function (t) {
+        const on = t[0] === pickedType;
+        return h('button', { type: 'button', role: 'radio', class: 'bp-seg-btn' + (on ? ' on' : ''), 'aria-checked': on ? 'true' : 'false',
+          onclick: function () { pickedType = t[0]; drawTypes(); drawSugg(); } }, t[1]);
+      }));
+    }
     function drawIcons() {
-      iconRow.replaceChildren.apply(iconRow, [''].concat(PLAN_ICONS).map(function (ic) {
-        const on = ic === pickedIcon;
-        return h('button', { type: 'button', role: 'radio', class: 'bp-icon' + (on ? ' on' : ''), 'aria-checked': on ? 'true' : 'false', 'aria-label': ic ? 'Icon ' + ic : 'No icon', title: ic ? null : 'No icon',
-          onclick: function () { pickedIcon = ic; drawIcons(); } }, ic || '∅');
+      const current = pickedIcon || CAT_ICONS.guess(nameIn.value);
+      iconGrid.replaceChildren.apply(iconGrid, CAT_ICONS.LIST.map(function (ic) {
+        const on = ic[0] === current;
+        const b = h('button', { type: 'button', role: 'radio', class: 'bp-icon' + (on ? ' on' : ''), 'aria-checked': on ? 'true' : 'false', 'aria-label': ic[1], title: ic[1],
+          onclick: function () { pickedIcon = ic[0]; drawIcons(); } });
+        b.appendChild(CAT_ICONS.svg(ic[0]));
+        return b;
       }));
     }
     function drawSugg() {
       const taken = {};
       plan().cats.forEach(function (c) { taken[c.name.toLowerCase()] = true; });
-      sugg.replaceChildren.apply(sugg, (BT.CATEGORY_SUGGESTIONS[typeSel.value] || []).filter(function (n) { return !taken[n.toLowerCase()]; }).map(function (n) { return h('option', { value: n }); }));
+      sugg.replaceChildren.apply(sugg, (BT.CATEGORY_SUGGESTIONS[pickedType] || []).filter(function (n) { return !taken[n.toLowerCase()]; }).map(function (n) { return h('option', { value: n }); }));
     }
     catForm.append(
-      h('div', { class: 'mo-card-head' }, formTitle, delBtn),
+      h('div', { class: 'mo-card-head' }, formTitle),
       h('div', { class: 'bp-form-grid' },
-        h('label', { class: 'bp-field' }, h('span', { class: 'mo-faint small' }, 'Name'), h('span', { class: 'tl-search-wrap' }, nameIn)),
-        h('label', { class: 'bp-field' }, h('span', { class: 'mo-faint small' }, 'Group'), typeSel),
-        h('label', { class: 'bp-field' }, h('span', { class: 'mo-faint small' }, 'Monthly limit (optional)'), h('span', { class: 'tl-search-wrap' }, h('span', { class: 'mo-faint small' }, book.currency), capIn))),
-      h('p', { class: 'mo-faint small bp-gap' }, 'Icon'), iconRow, sugg, formErr,
-      h('div', { class: 'mo-actions' },
+        h('label', { class: 'bp-field' }, h('span', { class: 'bp-field-name' }, 'Name'), nameIn),
+        h('label', { class: 'bp-field' }, h('span', { class: 'bp-field-name' }, 'Monthly limit (' + book.currency + ', optional)'), capIn),
+        h('div', { class: 'bp-field bp-span' }, h('span', { class: 'bp-field-name' }, 'Group'), typeSeg),
+        h('div', { class: 'bp-field bp-span' }, h('span', { class: 'bp-field-name' }, 'Icon'), iconGrid)),
+      sugg, formErr,
+      h('div', { class: 'bp-form-actions' }, delBtn, h('span', { class: 'bp-grow' }),
         h('button', { type: 'button', class: 'mo-link', onclick: closeForm }, 'Cancel'),
-        h('button', { type: 'submit', class: 'mo-btn' }, 'Save category')));
+        h('button', { type: 'submit', class: 'mo-btn bp-primary' }, 'Save')));
 
-    function openForm(cat) {
+    function openForm(cat, preset) {
+      if (!canEdit) return;
       editing = cat ? cat.name : '';
       formTitle.textContent = cat ? 'Edit category' : 'New category';
       delBtn.hidden = !cat;
-      nameIn.value = cat ? cat.name : '';
-      typeSel.value = cat ? cat.type : 'wants';
+      nameIn.value = cat ? cat.name : (preset && preset.name) || '';
+      pickedType = cat ? cat.type : (preset && preset.type) || 'wants';
       capIn.value = cat && cat.cents ? (cat.cents / 100).toFixed(2) : '';
       pickedIcon = cat ? cat.icon : '';
       formErr.hidden = true;
       catForm.hidden = false;
-      drawIcons(); drawSugg();
-      catForm.scrollIntoView({ block: 'nearest' });
-      nameIn.focus({ preventScroll: true });
+      drawTypes(); drawIcons(); drawSugg();
+      catForm.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      (nameIn.value ? capIn : nameIn).focus({ preventScroll: true });
     }
     function closeForm() { editing = null; catForm.hidden = true; }
     function fail(text) { formErr.textContent = text; formErr.hidden = false; }
@@ -6016,100 +6075,62 @@
       if (cents > 100000000000000) return fail('That limit is too large.');
       const next = plan();
       const key = name.toLowerCase();
-      const clash = next.cats.find(function (c) { return c.name.toLowerCase() === key && c.name.toLowerCase() !== String(editing).toLowerCase(); });
+      const old = String(editing || '').toLowerCase();
+      const clash = next.cats.find(function (c) { return c.name.toLowerCase() === key && c.name.toLowerCase() !== old; });
       if (clash) return fail('You already have a category called ' + clash.name + '.');
-      const cat = { name: name, type: typeSel.value, icon: pickedIcon, cents: cents };
+      const cat = { name: name, type: pickedType, icon: pickedIcon || CAT_ICONS.guess(name), cents: cents };
       const at = editing ? next.cats.findIndex(function (c) { return c.name === editing; }) : -1;
       if (at === -1 && next.cats.length >= BT.PLAN_MAX_CATS) return fail('You can have up to ' + BT.PLAN_MAX_CATS + ' categories.');
       if (at === -1) next.cats.push(cat); else next.cats[at] = cat;
       if (await save(next, editing ? 'Category updated' : 'Category added')) { closeForm(); drawAll(); }
     }
     async function removeCat(name) {
-      const ok = await ask({ title: 'Delete ' + name + '?', body: 'Its limit is removed. Transactions keep their category text.', yes: 'Delete', no: 'Cancel' });
+      const ok = await ask({ title: 'Delete ' + name + '?', body: 'Its limit is removed. Transactions keep their category.', yes: 'Delete', no: 'Cancel' });
       if (!ok) return;
       const next = plan();
       next.cats = next.cats.filter(function (c) { return c.name !== name; });
       if (await save(next, 'Category deleted')) { closeForm(); drawAll(); }
     }
 
-    const catsBody = h('div');
+    const catsGrid = h('div');
     catsCard.append(
-      h('div', { class: 'mo-card-head' }, h('h3', { id: 'bp-cats-h', class: 'mo-label' }, 'Categories & monthly limits'),
-        canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { openForm(null); } }, '+ New category') : null),
-      catForm, catsBody);
+      cardHead('bp-cats-h', 'Categories', canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { openForm(null); } }, '+ New category') : null),
+      catForm, catsGrid);
 
     function drawCats() {
-      const month = BT.monthOf(BT.today());
-      const txs = book.month(month);
-      const b = base();
-      const targets = BT.splitAmount(b.cents, plan().shares);
       const cats = plan().cats;
-      function spentOn(cat) {
-        const key = cat.name.toLowerCase();
-        return txs.reduce(function (t, x) {
-          if ((x.category || '').toLowerCase() !== key) return t;
-          if ((cat.type === 'income') !== (x.type === 'income')) return t;
-          return t + x.cents;
-        }, 0);
-      }
       if (!cats.length) {
-        catsBody.replaceChildren(h('p', { class: 'mo-empty' }, canEdit
-          ? 'No categories yet. Add one, like Dining Out with a ' + money(500000) + ' limit, to track it every month.'
-          : 'No categories yet.'));
+        catsGrid.replaceChildren(h('p', { class: 'mo-empty' }, canEdit ? 'No categories yet. Add one, like Dining Out with a monthly limit.' : 'No categories yet.'));
         return;
       }
-      catsBody.replaceChildren.apply(catsBody, PLAN_TYPES.map(function (t, gi) {
-        const list = cats.filter(function (c) { return c.type === t[0]; });
-        if (!list.length) return null;
-        const capped = list.reduce(function (s, c) { return s + c.cents; }, 0);
-        const target = t[0] === 'income' ? 0 : targets[t[0]];
-        const overAssigned = target > 0 && capped > target;
-        return h('div', { class: 'tl-group bp-group' },
-          h('div', { class: 'mo-card-head' },
-            h('h3', { class: 'mo-label' }, t[1]),
-            t[0] === 'income' ? null : h('span', { class: 'mo-faint small num' + (overAssigned ? ' bp-bad' : '') },
-              target > 0 ? money(capped) + ' of ' + money(target) + ' assigned' + (overAssigned ? ' · over by ' + money(capped - target) : '') : 'Log income or save a salary to see this group’s target')),
-          h('ul', { class: 'mo-list bp-list' }, list.map(function (c) {
-            const spent = spentOn(c);
-            const over = c.cents > 0 && spent > c.cents;
-            const near = c.cents > 0 && !over && spent >= c.cents * 0.9;
-            const note = c.cents > 0
-              ? (over ? money(spent - c.cents) + ' over' : (near ? 'Almost at limit · ' : '') + money(c.cents - spent) + ' left')
-              : 'No limit';
-            return h('li', { class: 'bp-row' },
-              h('span', { class: 'bp-ic', 'aria-hidden': 'true' }, c.icon || c.name.charAt(0).toUpperCase()),
-              h('span', { class: 'bp-row-main' },
-                h('span', { class: 'mo-limit-row' },
-                  h('span', { class: 'mo-list-title' }, c.name),
-                  h('span', { class: 'num' }, money(spent), h('span', { class: 'mo-faint' }, c.cents > 0 ? ' / ' + money(c.cents) : ''))),
-                c.cents > 0 ? h('div', { class: 'mo-bar' + (over ? ' over' : ''), role: 'meter', 'aria-label': c.name + ' used', 'aria-valuemin': 0, 'aria-valuemax': 100,
-                  'aria-valuenow': Math.min(100, Math.round(spent / c.cents * 100)), 'aria-valuetext': note },
-                  h('i', { style: 'width:' + Math.min(100, spent / c.cents * 100).toFixed(1) + '%' })) : null,
-                h('span', { class: 'mo-faint small' + (over ? ' bp-bad' : '') }, note + ' · ' + BT.monthLabel(month))),
-              canEdit ? h('span', { class: 'tl-tools' },
-                h('button', { type: 'button', class: 'tl-icon', 'aria-label': 'Edit ' + c.name, title: 'Edit', onclick: function () { openForm(c); } }, icon('edit')),
-                h('button', { type: 'button', class: 'tl-icon', 'aria-label': 'Delete ' + c.name, title: 'Delete', onclick: function () { removeCat(c.name); } }, icon('remove'))) : null);
-          })));
-      }).filter(Boolean).map(function (g, i) { if (i) g.classList.add('next'); return g; }));
+      catsGrid.replaceChildren(h('ul', { class: 'bp-tiles' }, PLAN_TYPES.reduce(function (out, t) {
+        return out.concat(cats.filter(function (c) { return c.type === t[0]; }));
+      }, []).map(function (c) {
+        const body = [CAT_ICONS.tile(c.icon || CAT_ICONS.guess(c.name)),
+          h('span', { class: 'bp-tile-text' },
+            h('span', { class: 'bp-tile-name' }, c.name),
+            h('span', { class: 'bp-tile-meta num' }, BT.TYPE_LABELS[c.type] + ' · ' + (c.cents ? money(c.cents) + ' / mo' : 'No limit')))];
+        return h('li', null, canEdit
+          ? h('button', { type: 'button', class: 'bp-tile', 'aria-label': 'Edit ' + c.name, onclick: function () { openForm(c); } }, body, h('span', { class: 'bp-tile-edit' }, icon('edit')))
+          : h('div', { class: 'bp-tile' }, body));
+      })));
     }
 
-    function drawAll() {
-      const b = base();
-      const local = canEdit && BT.planIsLocal();
-      sub.replaceChildren.apply(sub, [
-        b.cents > 0 ? 'Targets for ' + BT.monthLabel(BT.monthOf(BT.today())) + ' from your ' + (b.from === 'income' ? 'logged income' : 'salary') + ', ' + money(b.cents)
-          : 'Set your split, then log income or enter your salary to see your targets',
-        local ? h('span', { class: 'bp-local' }, ' · saved on this device only') : null].filter(Boolean));
-      drawSplit(); drawCalc(); drawCats();
+    function drawAll() { drawSplit(); drawCalc(); drawCats(); }
+
+    /* From "Category limits vs actuals": edit a category, or create it if it is only a transaction label. */
+    function editCategory(name, type) {
+      const c = planCat(book, name);
+      openForm(c, c ? null : { name: name, type: type });
     }
 
-    return { el: el, draw: drawAll };
+    return { el: el, draw: drawAll, editCategory: editCategory };
   }
 
   /* ---------- Savings tracker (bank accounts, wallets, credit cards, loans) ---------- */
 
   const DASH_SOON = ['tracker', 'wallet', 'savings', 'credit', 'loan'];
-  const DASH_TABS = [['overview', 'Overview'], ['transactions', 'Transactions'], ['plan', 'Budget Plan'], ['budget', '50/30/20']];
+  const DASH_TABS = [['overview', 'Overview'], ['plan', 'Budget & Transactions']];
 
   function amountsHidden() { try { return localStorage.getItem('pbh.hideAmounts') === '1'; } catch (e) { return false; } }
   function setAmountsHidden(on) { try { localStorage.setItem('pbh.hideAmounts', on ? '1' : '0'); } catch (e) { /* storage off */ } }
@@ -6623,12 +6644,55 @@
     if (t && user) SOC.syncTrustCurrency(user.currency);
   });
   BT.onTxChange(function () {
-    if ((state.view === 'dashboard' || state.view === 'transactions' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
+    if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
   });
   BT.onPlanChange(function () {
-    if ((state.view === 'dashboard' || state.view === 'transactions' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
+    if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
   });
+  /* ---------- New-alert pop-up, bottom right ---------- */
+  var seenNotes = null;
+  var popBox = null;
+  function notePopText(note, person) {
+    const first = person.name.split(' ')[0];
+    switch (note.type) {
+      case 'request': return person.name + ' wants to add you to their circle.';
+      case 'trust': return person.name + ' invited you as their trusted person.';
+      case 'trusted': return first + ' accepted. They can now see your dashboard.';
+      case 'debt': return person.name + (note.dir === 'owe' ? ' noted that they owe you ' : ' noted that you owe them ') + BT.formatMoney(note.cents || 0, note.currency || 'PHP') + '.';
+      default: return person.name + ' accepted your circle request.';
+    }
+  }
+  function showNotePop(note) {
+    SOC.getProfile(note.from).then(function (person) {
+      if (!person || state.view === 'alerts') return;
+      if (!popBox) { popBox = h('div', { class: 'note-pops', 'aria-live': 'polite' }); document.body.appendChild(popBox); }
+      let timer = null;
+      const close = h('button', { type: 'button', class: 'note-pop-x', 'aria-label': 'Dismiss', title: 'Dismiss', onclick: function (e) { e.stopPropagation(); remove(); } }, icon('close'));
+      const card = h('div', { class: 'note-pop', role: 'status', tabindex: '0',
+        onclick: function () { remove(); location.hash = '#notifications'; },
+        onkeydown: function (e) { if (e.key === 'Enter') { remove(); location.hash = '#notifications'; } }
+      },
+        avatar(person, person.avatar, 2.25),
+        h('div', { class: 'note-pop-body' }, h('p', { class: 'note-pop-title' }, 'New alert'), h('p', { class: 'note-pop-text' }, notePopText(note, person))),
+        close);
+      function remove() { clearTimeout(timer); card.classList.add('out'); setTimeout(function () { card.remove(); }, 200); }
+      card.addEventListener('mouseenter', function () { clearTimeout(timer); });
+      card.addEventListener('mouseleave', function () { timer = setTimeout(remove, 4000); });
+      while (popBox.children.length >= 3) popBox.firstChild.remove();
+      popBox.appendChild(card);
+      timer = setTimeout(remove, 7000);
+    }).catch(function () {});
+  }
   SOC.onNotifications(function (notes) {
+    /* The first list after signing in is what you already have; only later arrivals pop up. */
+    if (seenNotes === null) { seenNotes = {}; notes.forEach(function (n) { seenNotes[n.id] = true; }); }
+    else {
+      notes.forEach(function (n) {
+        if (seenNotes[n.id]) return;
+        seenNotes[n.id] = true;
+        if (!n.read) showNotePop(n);
+      });
+    }
     drawBadges();
     if (state.view === 'alerts' && state.drawNotes) {
       state.drawNotes(notes);

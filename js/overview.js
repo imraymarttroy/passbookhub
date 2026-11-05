@@ -97,9 +97,20 @@ window.OVERVIEW = (function () {
     const midBox = h('div', { class: 'mo-row mo-mid' });
     const lowBox = h('div', { class: 'mo-row mo-low' });
     const cashBox = h('section', { class: 'mo-card', 'aria-labelledby': 'mo-cash-h' });
+    const planner = ctx.mode === 'planner';
+    /* The Budget page: where the money goes, category limits, what's recent and due, and your goals. */
+    const catBox = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-donut-h' });
+    const limBox = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-lim-h' });
+    const goalsBox = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-goals-h' });
+    let limAll = false;
     el.className = 'ov mo';
-    el.append(h('div', { class: 'mo-head' }, h('h2', null, 'Overview'), h('p', { class: 'mo-sub', id: 'mo-month' })),
-      heroBox, midBox, lowBox, cashBox);
+    if (planner) {
+      el.classList.add('bp-more');
+      el.append(h('div', { class: 'mo-row bp-chart-row' }, catBox, cashBox), limBox, lowBox, goalsBox);
+    } else {
+      el.append(h('div', { class: 'mo-head' }, h('h2', null, 'Overview'), h('p', { class: 'mo-sub', id: 'mo-month' })),
+        heroBox, midBox, lowBox, cashBox);
+    }
 
     /* ---- Live data ---- */
     const stops = [
@@ -1369,9 +1380,10 @@ window.OVERVIEW = (function () {
       const recent = moCard('Recent activity', 'mo-recent-h',
         txs.length ? h('ul', { class: 'mo-list' }, txs.map(function (t) {
           const plus = t.type === 'income';
-          return h('li', null,
+          return h('li', { class: planner ? 'bp-li' : null },
+            planner ? CAT_ICONS.tile(iconFor(t.category, t.type), 'sm') : null,
             h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, t.desc || BT.TYPE_LABELS[t.type]),
-              h('span', { class: 'mo-faint' }, BT.TYPE_LABELS[t.type] + ' · ' + dayLabel(t.date, today))),
+              h('span', { class: 'mo-faint' }, [t.category || BT.TYPE_LABELS[t.type], dayLabel(t.date, today)].join(' · '))),
             h('span', { class: 'num' }, (hiddenAmounts() ? '' : (plus ? '+' : '−')) + show(t.cents)));
         })) : moEmpty('No transactions yet.'),
         h('div', { class: 'mo-actions' },
@@ -1395,8 +1407,9 @@ window.OVERVIEW = (function () {
       const bills = moCard('Upcoming bills · 7 days', 'mo-bills-h',
         data.debts === null ? moEmpty('Loading…')
           : due.length ? h('ul', { class: 'mo-list' }, due.map(function (d) {
-            return h('li', null,
-              h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, d.note || d.person || 'Bill'), h('span', { class: 'mo-faint' }, when(d))),
+            return h('li', { class: planner ? 'bp-li' : null },
+              planner ? CAT_ICONS.tile(d.note && CAT_ICONS.guess(d.note) !== 'tag' ? CAT_ICONS.guess(d.note) : 'receipt', 'sm') : null,
+              h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, d.note || d.person || 'Bill'), h('span', { class: 'mo-faint' + (daysBetween(today, d.due) <= 1 ? ' bp-bad' : '') }, when(d))),
               h('span', { class: 'num' }, show(leftOf(d))));
           })) : moEmpty('Nothing due in the next 7 days.'),
         book.canEdit ? h('div', { class: 'mo-actions' }, h('button', { type: 'button', class: 'mo-link', onclick: function () { debtForm(null, 'owe'); } }, '+ Add a bill')) : null);
@@ -1453,10 +1466,148 @@ window.OVERVIEW = (function () {
       lastC = c;
       const monthEl = el.querySelector('#mo-month');
       if (monthEl) monthEl.textContent = BT.monthLabel(c.month);
+      if (planner) {
+        drawCatDonut(c);
+        drawCash(c);
+        drawCatLimits(c);
+        drawLow(c);
+        drawGoalsMini(c);
+        return;
+      }
       drawHero(c);
       drawMid(c);
       drawLow(c);
       drawCash(c);
+    }
+
+    /* ---------- Budget page sections ---------- */
+    const SHADES = [1, 0.72, 0.5, 0.34, 0.22, 0.12];
+    function planOf() { return (book.plan && book.plan()) || { cats: [] }; }
+    function catOf(name) {
+      const key = String(name || '').trim().toLowerCase();
+      return planOf().cats.find(function (x) { return x.name.toLowerCase() === key; }) || null;
+    }
+    function iconFor(name, type) {
+      if (!name) return ({ needs: 'home', wants: 'bag', savings: 'piggy', income: 'coins' })[type] || 'tag';
+      const p = catOf(name);
+      return p && p.icon ? p.icon : CAT_ICONS.guess(name);
+    }
+    /** This month's needs and wants, grouped by category (case-insensitive). */
+    function spendByCategory(month) {
+      const groups = {};
+      book.list().forEach(function (t) {
+        if (BT.monthOf(t.date) !== month || (t.type !== 'needs' && t.type !== 'wants')) return;
+        const raw = (t.category || '').trim();
+        const key = raw ? raw.toLowerCase() : '__' + t.type;
+        const g = groups[key] || (groups[key] = { name: raw || ('Other ' + BT.TYPE_LABELS[t.type].toLowerCase()), label: raw, type: t.type, cents: 0 });
+        g.cents += t.cents;
+      });
+      return Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return b.cents - a.cents; });
+    }
+
+    function drawCatDonut(c) {
+      const groups = spendByCategory(c.month);
+      const total = groups.reduce(function (t, g) { return t + g.cents; }, 0);
+      let parts = groups.slice(0, 5);
+      if (groups.length > 5) {
+        const rest = groups.slice(5).reduce(function (t, g) { return t + g.cents; }, 0);
+        parts = parts.concat([{ name: 'Everything else', label: '', type: 'other', cents: rest, other: true }]);
+      }
+      const r = 48, C = 2 * Math.PI * r;
+      const ring = svg('svg', { viewBox: '0 0 120 120', class: 'mo-donut', role: 'img', 'aria-label': 'Spending by category this month' });
+      ring.appendChild(svg('circle', { cx: 60, cy: 60, r: r, class: 'mo-donut-track' }));
+      const g = svg('g', { transform: 'rotate(-90 60 60)' });
+      let off = 0;
+      parts.forEach(function (p, i) {
+        const len = p.cents / total * C;
+        g.appendChild(svg('circle', { cx: 60, cy: 60, r: r, class: 'mo-donut-seg', 'stroke-opacity': SHADES[i],
+          'stroke-dasharray': Math.max(0, len - (parts.length > 1 ? 1.5 : 0)).toFixed(2) + ' ' + C.toFixed(2), 'stroke-dashoffset': (-off).toFixed(2) }));
+        off += len;
+      });
+      ring.appendChild(g);
+      const mid = svg('text', { x: 60, y: 58, 'text-anchor': 'middle', class: 'mo-donut-total' });
+      mid.textContent = hiddenAmounts() ? '••••' : compact.format(total / 100);
+      const sub = svg('text', { x: 60, y: 74, 'text-anchor': 'middle', class: 'mo-tick' });
+      sub.textContent = 'spent';
+      ring.append(mid, sub);
+      catBox.replaceChildren(
+        h('div', { class: 'mo-card-head' }, h('h3', { id: 'bp-donut-h', class: 'mo-label' }, 'Spending by category · ' + shortMonth(c.month))),
+        total > 0 ? h('div', { class: 'bp-donut' }, ring,
+          h('ul', { class: 'bp-legend' }, parts.map(function (p, i) {
+            return h('li', null,
+              h('span', { class: 'mo-dot', style: 'opacity:' + SHADES[i] }),
+              h('span', { class: 'bp-legend-name' }, p.name),
+              h('span', { class: 'num bp-legend-pct' }, Math.round(p.cents / total * 100) + '%'),
+              h('span', { class: 'num mo-faint bp-legend-amt' }, show(p.cents)));
+          })))
+          : moEmpty('No spending yet this month.'));
+    }
+
+    function drawCatLimits(c) {
+      const groups = spendByCategory(c.month);
+      const seen = {};
+      const rows = groups.map(function (g) {
+        if (g.label) seen[g.label.toLowerCase()] = true;
+        const p = g.label ? catOf(g.label) : null;
+        return { name: g.name, label: g.label, type: g.type, spent: g.cents, limit: p ? p.cents : 0 };
+      });
+      planOf().cats.forEach(function (p) {
+        if (p.cents > 0 && (p.type === 'needs' || p.type === 'wants') && !seen[p.name.toLowerCase()]) rows.push({ name: p.name, label: p.name, type: p.type, spent: 0, limit: p.cents });
+      });
+      rows.sort(function (a, b) {
+        const ra = a.limit ? a.spent / a.limit : -1, rb = b.limit ? b.spent / b.limit : -1;
+        return b.spent - a.spent || rb - ra;
+      });
+      const today = c.today;
+      const daysLeft = c.month === BT.monthOf(today) ? daysInMonth(c.month) - +today.slice(8, 10) : 0;
+      const shown = limAll ? rows : rows.slice(0, 8);
+      limBox.replaceChildren.apply(limBox, [
+        h('div', { class: 'mo-card-head' }, h('h3', { id: 'bp-lim-h', class: 'mo-label' }, 'Category limits vs actuals'),
+          h('span', { class: 'mo-faint small' }, daysLeft === 1 ? '1 day left in ' + shortMonth(c.month) : daysLeft + ' days left in ' + shortMonth(c.month))),
+        rows.length ? h('ul', { class: 'bp-lims' }, shown.map(function (r) {
+          const left = r.limit - r.spent;
+          const over = r.limit > 0 && left < 0;
+          const near = r.limit > 0 && !over && r.spent >= r.limit * 0.9;
+          const note = r.limit > 0 ? (over ? show(-left) + ' over' : show(left) + ' left') : 'No limit';
+          const editable = book.canEdit && book.mine && r.label;
+          return h('li', { class: 'bp-lim' + (over ? ' is-over' : near ? ' is-near' : '') },
+            CAT_ICONS.tile(iconFor(r.label, r.type)),
+            h('div', { class: 'bp-lim-main' },
+              h('div', { class: 'bp-lim-top' },
+                h('span', { class: 'bp-lim-name' }, r.name),
+                h('span', { class: 'num bp-lim-amt' }, show(r.spent), r.limit > 0 ? h('span', { class: 'mo-faint' }, ' / ' + show(r.limit)) : null)),
+              moBar(r.limit > 0 ? r.spent / r.limit : 0, over ? 'over' : null),
+              h('div', { class: 'bp-lim-foot' },
+                h('span', { class: over ? 'bp-bad' : 'mo-faint' }, note + (near ? ' · almost at limit' : '')),
+                editable ? h('button', { type: 'button', class: 'mo-link', onclick: function () { if (ctx.editCategory) ctx.editCategory(r.label, r.type); } }, r.limit > 0 ? 'Edit limit' : 'Set limit') : null)));
+        })) : moEmpty('No spending yet this month. Your categories show here as you add expenses.'),
+        rows.length > 8 ? h('div', { class: 'mo-actions' }, h('span', { class: 'mo-faint small' }, shown.length + ' of ' + rows.length),
+          h('button', { type: 'button', class: 'mo-link', onclick: function () { limAll = !limAll; drawCatLimits(compute()); } }, limAll ? 'Show less' : 'Show all')) : null].filter(Boolean));
+    }
+
+    function drawGoalsMini(c) {
+      const head = h('div', { class: 'mo-card-head' }, h('h3', { id: 'bp-goals-h', class: 'mo-label' }, 'Savings goals'),
+        book.canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { goalForm(null); } }, '+ New goal') : null);
+      if (data.goals === null) { goalsBox.replaceChildren(head, moEmpty('Loading…')); return; }
+      if (data.goalError) { goalsBox.replaceChildren(head, moEmpty(data.goalError)); return; }
+      const goals = data.goals.slice().sort(function (a, b) { return (a.kind === 'emergency' ? 0 : 1) - (b.kind === 'emergency' ? 0 : 1); });
+      const kindIcon = { emergency: 'umbrella', travel: 'plane', education: 'education', house: 'home', vehicle: 'car', gadget: 'phone', wedding: 'heart',
+        business: 'briefcase', retirement: 'piggy', family: 'family', personal: 'star', health: 'health', other: 'target' };
+      if (!goals.length) {
+        goalsBox.replaceChildren(head, moEmpty(book.canEdit ? 'No goals yet. Start with an emergency fund: 3 to 6 months of needs.' : 'No goals yet.'));
+        return;
+      }
+      goalsBox.replaceChildren(head, h('ul', { class: 'bp-goals' }, goals.map(function (g) {
+        const pct = g.targetCents > 0 ? Math.min(100, Math.round(g.savedCents / g.targetCents * 100)) : 0;
+        const body = [
+          h('span', { class: 'bp-goal-top' }, CAT_ICONS.tile(kindIcon[g.kind] || 'target'),
+            h('span', { class: 'bp-goal-name' }, g.name), h('span', { class: 'num bp-goal-pct' }, pct + '%')),
+          moBar(pct / 100),
+          h('span', { class: 'bp-goal-amt num' }, show(g.savedCents), h('span', { class: 'mo-faint' }, ' / ' + show(g.targetCents)))];
+        return h('li', null, book.canEdit
+          ? h('button', { type: 'button', class: 'bp-goal', 'aria-label': 'Edit goal ' + g.name, onclick: function () { goalForm(g); } }, body)
+          : h('div', { class: 'bp-goal' }, body));
+      })));
     }
     draw();
     return { el: el, refresh: draw };
