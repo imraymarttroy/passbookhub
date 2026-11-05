@@ -3485,3 +3485,11 @@ body.auth-body .narrow, #app > .narrow {
 #app > .narrow .intro p { font-size: 0.875rem; }
 .su-otp-icon svg { width: 1rem; height: 1rem; }
 .auth-center .su-pane .su-fine { display: none; }
+
+/* OTP switch: thin outline, small dot. No fill, no shadow. */
+.su-switch { width: 2rem; height: 1.125rem; }
+.su-switch-ui { border-radius: 999px; background: transparent !important; border: 1px solid var(--line-strong); transition: border-color 0.2s; }
+.su-switch-ui::after { top: 50%; left: 3px; width: 0.625rem; height: 0.625rem; margin-top: -0.3125rem; border-radius: 50%; background: var(--line-strong); box-shadow: none; transition: transform 0.2s, background 0.2s; }
+.su-switch-input:checked + .su-switch-ui { border-color: var(--ink); }
+.su-switch-input:checked + .su-switch-ui::after { transform: translateX(0.875rem); background: var(--ink); }
+.su-switch-input:focus-visible + .su-switch-ui { outline: 1px solid var(--ink-2); outline-offset: 2px; }
