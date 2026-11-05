@@ -3567,3 +3567,6 @@ body.auth-body .narrow, #app > .narrow {
   .pf-page .pf-card { padding: 1rem; }
   .pf-page .pf-circle-people { gap: 0.5rem 0.25rem; }
 }
+.pf-page .note-bubble { background: transparent !important; border: 1px solid var(--line-strong) !important; color: var(--ink) !important; box-shadow: none !important; border-radius: 10px; }
+.pf-page .note-bubble::before, .pf-page .note-bubble::after { display: none !important; }
+.pf-page .note-bubble:hover { background: var(--wash) !important; }
