@@ -322,13 +322,6 @@
       root.replaceChildren(content);
     }
     dock.sync(SHELL_VIEWS.indexOf(view) !== -1);
-    if (SHELL_VIEWS.indexOf(view) !== -1 && BT.currentUser() && window.WHATS_NEW) {
-      /* Features pop-up: once per login, after the page has painted. */
-      const uid = BT.currentUser().id;
-      setTimeout(function () {
-        if (BT.currentUser() && BT.currentUser().id === uid && SHELL_VIEWS.indexOf(state.view) !== -1) WHATS_NEW.showOnLogin(uid);
-      }, 400);
-    }
     if (changed) {
       window.scrollTo(0, 0);
       const heading = root.querySelector('h1');
