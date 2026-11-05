@@ -3229,6 +3229,7 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
     display: inline-flex; align-items: center;
     border: 1px solid var(--line-strong); border-radius: 999px; color: var(--ink);
   }
+  .top-btn.ai-top-btn { border-radius: 999px !important; }
   .top-btn.ai-top-btn:hover { border-color: var(--ink-2); }
   .ai-top-btn .top-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 0.8125rem; font-weight: 500; }
   .ai-top-btn svg { width: 1.125rem; height: 1.125rem; color: var(--accent); }
