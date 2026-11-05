@@ -562,13 +562,14 @@
     mainBox.append.apply(mainBox, [
           h('span', { class: 'auth-wordmark auth-wordmark-mobile' }, logoMark('auth-wordmark-mark'), 'PassbookHub'),
           signin ? h('h1', { class: 'auth-title' }, 'Welcome back') : null,
+          signin ? h('p', { class: 'auth-sub' }, 'Sign in to your budget.') : null,
           notice ? h('p', { class: 'notice', role: 'status' }, notice) : null,
           signin ? signInForm() : signUpForm(mainBox),
           signin ? h('p', { class: 'auth-switch' }, ['Don\u2019t have an account? ', h('a', { href: '#signup' }, 'Sign up')]) : null,
           h('p', { class: 'or-divider' }, h('span', null, 'Or')),
           socialButtons(view, redirectError)].filter(Boolean));
-    return h('div', { class: 'auth-page' },
-      authHero(signin),
+    /* One centred column: logo, a single card with the form, and the footer. */
+    return h('div', { class: 'auth-page auth-center' },
       h('div', { class: 'auth-panel' },
         mainBox,
         h('footer', { class: 'auth-footer' },

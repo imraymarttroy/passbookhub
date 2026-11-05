@@ -233,6 +233,50 @@ h1 .swap { background: none !important; -webkit-background-clip: border-box !imp
 .icon-btn:hover, .card:hover .card-icon { transform: none !important; }
 .tabs, .mode, .icon-btn, .search, .toc a, .top, button { border-radius: 4px; }
 .face, .matrix, .dd-col, .sec { border-radius: 20px; }
+
+/* ---------- Minimal, flat: same look as the PassbookHub Overview ---------- */
+:root { --page: #e8e9f3; --surface: transparent; --surface-2: rgba(39,38,53,.06); --line: #cecece; --shadow: none; --accent: #272635; --on-accent: #e8e9f3; --brand: rgba(39,38,53,.06); }
+:root[data-theme="dark"] { --page: #272635; --surface: transparent; --surface-2: rgba(232,233,243,.07); --line: #3e3d50; --accent: #e8e9f3; --on-accent: #272635; --brand: rgba(232,233,243,.07); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --page: #272635; --surface: transparent; --surface-2: rgba(232,233,243,.07); --line: #3e3d50; --accent: #e8e9f3; --on-accent: #272635; --brand: rgba(232,233,243,.07); } }
+.blobs, .confetti, .face::after { display: none !important; }
+.bar { background: var(--page) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; border-bottom: 1px solid var(--line); }
+.progress { background: var(--ink) !important; height: 2px; }
+.hero-in { padding: 3rem 1.25rem 1.5rem; }
+h1 { font-weight: 600; letter-spacing: -0.02em; font-size: clamp(1.75rem, 4.5vw, 2.5rem); }
+h1 .swap { background: none !important; color: var(--ink) !important; -webkit-background-clip: initial; background-clip: initial; }
+.eyebrow, .chip { background: transparent; border-color: var(--line); font-weight: 500; }
+.eyebrow .dot { animation: none; background: var(--ink-2); box-shadow: none; }
+.tabs, .mode, .matrix, .dd-col, .sec, .search, .btn, .face, .top { box-shadow: none !important; border-radius: 10px; }
+.tabs { border-radius: 10px; }
+.tab, .tab-thumb, .mode button { border-radius: 8px; }
+.tab-thumb { background: var(--ink); transition: left .25s ease, width .25s ease; }
+.tab[aria-selected="true"] { color: var(--page); }
+.mode button[aria-pressed="true"] { box-shadow: none; }
+.icon-btn { background: transparent; border-radius: 10px; }
+.icon-btn:hover { transform: none; background: var(--surface-2); }
+.card { transition: transform .45s ease; }
+.card-icon { background: transparent !important; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); }
+.card:hover .card-icon { transform: none; }
+.face.back { background: var(--ink); color: var(--page); }
+.mx-head { background: transparent; border-bottom: 1px solid var(--line); }
+.mx-row:hover, .mx-row[aria-expanded="true"] { background: var(--surface-2); }
+.pip.yes, .pip.opt { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); }
+.pip.no { background: transparent; color: var(--line-strong); }
+.dd-col.do .mark, .dd-col.dont .mark { background: transparent; border: 1px solid var(--line-strong); color: var(--ink); }
+.toc a.on { background: var(--surface-2); box-shadow: none; }
+.toc a.on::before { background: var(--ink); }
+.search:focus-within { border-color: var(--ink-2); box-shadow: none; }
+.sec-num { border-radius: 8px; background: transparent; border: 1px solid var(--line); }
+.sec.open .sec-num { background: var(--ink); color: var(--page); border-color: var(--ink); }
+.plain { background: var(--surface-2) !important; border-radius: 8px; }
+.plain b { background: transparent; color: var(--ink-2); border: 1px solid var(--line-strong); }
+.sec-inner a { color: var(--ink); text-decoration: underline; }
+mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
+.end { background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 10px; }
+.end .btn { background: var(--ink); color: var(--page); border-radius: 10px; }
+.ring .track { stroke: var(--line); }
+.ring .val { stroke: var(--ink); }
+.top { background: var(--page); }
 </style>
 </head>
 <body>
