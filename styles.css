@@ -3632,3 +3632,16 @@ body.auth-body .narrow, #app > .narrow {
 .set-page .currency-button { background: transparent !important; border: 1px solid var(--line-strong) !important; border-radius: 10px !important; box-shadow: none !important; }
 .set-page .currency-list { background: var(--page) !important; border: 1px solid var(--line) !important; border-radius: 10px !important; box-shadow: none !important; }
 .set-page .currency-option:hover, .set-page .currency-option[aria-selected="true"] { background: var(--wash) !important; }
+
+/* Install app (sidebar foot) */
+.install-btn {
+  display: inline-flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem;
+  border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--ink);
+  font: inherit; font-size: 0.8125rem; cursor: pointer;
+}
+.install-btn[hidden] { display: none; }
+.install-btn:hover { background: var(--wash); border-color: var(--line-strong); }
+.install-btn svg { width: 1rem; height: 1rem; flex: none; }
+@media (min-width: 761px) { .collapsed .install-btn span { display: none; } .collapsed .install-btn { width: 2.25rem; justify-content: center; padding: 0.5rem 0; } }
+/* Installed app: a touch more room at the top, no browser bar above it */
+@media (display-mode: standalone) { .install-btn { display: none !important; } }

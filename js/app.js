@@ -2134,6 +2134,23 @@
     return h('li', null, btn);
   }
 
+  /* "Install app": shows when the browser can install PassbookHub (Chrome, Edge), hidden once installed. */
+  function installButton() {
+    const b = h('button', { type: 'button', class: 'install-btn', title: 'Install PassbookHub as an app', hidden: true,
+      onclick: async function () {
+        const p = window.__pbhInstall;
+        if (!p) return;
+        p.prompt();
+        try { const r = await p.userChoice; if (r && r.outcome === 'accepted') { window.__pbhInstall = null; sync(); } } catch (e) { /* ignore */ }
+      } });
+    b.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5v9M6.5 9 10 12.5 13.5 9M4 15.5h12"/></svg><span>Install app</span>';
+    const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    function sync() { b.hidden = standalone || !window.__pbhInstall; }
+    document.addEventListener('pbh-installable', sync);
+    sync();
+    return b;
+  }
+
   /* Sign out sits under the online count on big screens and stays in the nav bar on phones. */
   function signOutButton() {
     return h('button', {
@@ -2221,7 +2238,7 @@
           lockedItem('Blog'),
           lockedItem('Games'),
           h('li', { class: 'nav-signout-li' }, signOutButton()))),
-      h('div', { class: 'sidebar-foot' }, onlineBadge(), signOutIcon(), versionButton(' side-version')));
+      h('div', { class: 'sidebar-foot' }, onlineBadge(), installButton(), signOutIcon(), versionButton(' side-version')));
     drawBadges();
     const shellEl = h('div', { class: 'app-shell' },
       h('div', { class: 'bg-orbs', 'aria-hidden': 'true' }, h('span'), h('span')),
