@@ -667,6 +667,14 @@
   };
 
   /** "Continue with Google". Icon markup comes only from the table above. */
+  /** "I agree to the Terms and Privacy Policy" checkbox (required to create an account). */
+  function consentBox(id) {
+    return h('label', { class: 'consent', for: id },
+      h('input', { type: 'checkbox', id: id, name: 'agree' }),
+      h('span', null, 'I agree to the ', h('a', { href: 'legal.html#terms', target: '_blank', rel: 'noopener' }, 'Terms'),
+        ' and ', h('a', { href: 'legal.html#privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.'));
+  }
+
   function socialButtons(view, initialError) {
     const status = h('p', { class: 'form-error', role: 'alert', hidden: !initialError }, initialError || '');
     const buttons = ['google'].map(function (which) {
@@ -691,14 +699,23 @@
             status.hidden = false;
           } finally {
             if (button.isConnected) {
-              all.forEach(function (b) { b.disabled = false; });
+              const tick = box.querySelector('.consent input');
+              all.forEach(function (b) { b.disabled = !!tick && !tick.checked; });
               button.querySelector('.social-label').textContent = label;
             }
           }
         }
       }, logo, h('span', { class: 'social-label' }, label), h('span', { class: 'social-chevron', 'aria-hidden': 'true' }, '\u203a'));
     });
-    const box = h('div', { class: 'stack' }, buttons, status);
+    /* Signing up with Google creates an account too, so it needs the same "I agree" first. */
+    const agree = view === 'signup' ? consentBox('f-agree-google') : null;
+    if (agree) {
+      const tick = agree.querySelector('input');
+      const sync = function () { buttons.forEach(function (b) { b.disabled = !tick.checked; }); };
+      tick.addEventListener('change', sync);
+      sync();
+    }
+    const box = h('div', { class: 'stack' }, agree, buttons, status);
     return box;
   }
 
@@ -832,15 +849,13 @@
         otpCard,
         h('div', { class: 'su-fine small' },
           h('p', null, 'Your budget is private. Only you, and the one trusted person you choose, can see your entries, goals and debts.'),
-          h('p', null, 'By tapping Submit, you agree to create a PassbookHub account and to PassbookHub’s ',
-            h('a', { href: 'legal.html#terms', target: '_blank', rel: 'noopener' }, 'Terms'), ' and ',
-            h('a', { href: 'legal.html#privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'), '.'),
           h('p', null, 'The ', h('a', { href: 'legal.html#privacy', target: '_blank', rel: 'noopener' }, 'Privacy Policy'),
-            ' explains what we collect when you create an account and how it’s used. We don’t sell your data or show ads.')))
+            ' explains what we collect when you create an account and how it’s used. We don’t sell your data or show ads.')),
+        consentBox('f-agree'))
     ];
 
     const next = h('button', { class: 'btn primary full su-next', type: 'submit' }, 'Next');
-    const have = h('a', { class: 'btn full su-have', href: '#signin' }, 'I already have an account');
+    const have = h('p', { class: 'su-have-line' }, 'Already have an account? ', h('a', { href: '#signin' }, 'Sign in'));
 
     const form = h('form', {
       class: 'su-form shake-errors',
@@ -866,6 +881,7 @@
           });
         }
         if (step < STEPS.length - 1) return go(step + 1);
+        if (!form.elements.agree.checked) return showErrors(form, { _form: 'Please agree to the Terms and Privacy Policy to create your account.' });
         /* Last step: anything still wrong sends you back to its screen. */
         const firstBad = STEPS.findIndex(function (s) { return errors[s.key]; });
         if (firstBad !== -1) { go(firstBad); return showErrors(form, pick(errors, STEPS[firstBad].key)); }
@@ -911,12 +927,16 @@
       bar.firstChild.style.width = ((n + 1) / STEPS.length * 100) + '%';
       back.style.visibility = n === 0 ? 'hidden' : 'visible';
       next.textContent = n === STEPS.length - 1 ? 'Submit' : 'Next';
+      syncAgree();
       if (host) host.classList.toggle('su-later', n > 0);
       if (n === 3) suggestUsername();
       const control = form.elements[STEPS[n].key];
       setTimeout(function () { if (control && control.isConnected) control.focus(); }, 30);
     }
 
+    /* Submit stays off until they tick "I agree" on the last step. */
+    function syncAgree() { next.disabled = step === STEPS.length - 1 && !form.elements.agree.checked; }
+    form.elements.agree.addEventListener('change', function () { syncAgree(); if (form.elements.agree.checked) clearErrors(form); });
     form.elements.username.addEventListener('input', checkUsername);
     form.elements.password.addEventListener('input', strength);
     form.elements.birthday.addEventListener('change', function () {

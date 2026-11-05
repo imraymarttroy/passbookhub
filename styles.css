@@ -3440,3 +3440,46 @@ body.auth-body .narrow, #app > .narrow {
 }
 .auth-center .btn:not(.primary):not(.social-btn) { background: transparent; border: 1px solid var(--line-strong); color: var(--ink); box-shadow: none; }
 .auth-center .btn:not(.primary):not(.social-btn):hover { background: var(--wash); }
+
+/* Sign up: "Already have an account? Sign in" as a quiet line, with room under Next */
+.su-have-line { margin: 1.25rem 0 0; text-align: center; font-size: 0.875rem; color: var(--ink-2); }
+.su-have-line a { color: var(--ink); font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.auth-center .su-next { margin-top: 1.25rem; }
+.auth-center .su-next:disabled { opacity: 0.4; cursor: not-allowed; }
+.auth-center .su-fine { color: var(--ink-2); font-size: 0.8125rem; }
+.auth-center .su-fine a { color: var(--ink); font-weight: 500; }
+
+/* "I agree to the Terms and Privacy Policy" */
+.consent { display: flex; align-items: flex-start; gap: 0.625rem; margin: 1rem 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--ink-2); cursor: pointer; }
+.consent input { flex: none; width: 1rem !important; height: 1rem; min-height: 0 !important; margin: 0.125rem 0 0; padding: 0 !important; accent-color: var(--ink); cursor: pointer; }
+.consent a { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+.stack > .consent { margin: 0 0 0.75rem; }
+
+/* Two-step verification (OTP): flat and quiet */
+.auth-center .su-otp, .su-otp, .su-otp[data-on="true"] {
+  padding: 0.875rem 1rem; border: 1px solid var(--line); border-radius: 10px; background: transparent;
+}
+.su-otp-icon { width: 2.25rem; height: 2.25rem; border-radius: 8px; background: transparent; border: 1px solid var(--line-strong); color: var(--ink); font-weight: 600; }
+.su-otp[data-on="true"] .su-otp-digits { animation: none; }
+.su-otp-note { color: var(--ink-2); font-size: 0.8125rem; }
+.su-otp[data-on="false"] .su-otp-note { color: var(--ink-2); }
+.su-switch-ui { border-radius: 999px; background: var(--line-strong); }
+.su-switch-ui::after { box-shadow: none; background: var(--page); }
+.su-switch-input:checked + .su-switch-ui { background: var(--ink); }
+.su-switch-input:focus-visible + .su-switch-ui { outline: 1px solid var(--ink-2); }
+
+.otp-card { border: 1px solid var(--line); border-radius: 10px; background: var(--page); box-shadow: none; padding: 1.5rem; }
+.otp-icon { width: 2.5rem; height: 2.5rem; border-radius: 10px; background: transparent; border: 1px solid var(--line-strong); color: var(--ink); }
+.otp-icon svg { width: 1.125rem; height: 1.125rem; }
+.otp-head h2 { font-size: 1.125rem; font-weight: 600; }
+.otp-input { border-radius: 10px !important; }
+.otp-card .btn.primary, .otp-setup .btn.primary { background: var(--ink); border-color: var(--ink); color: var(--page); border-radius: 10px; box-shadow: none; }
+.otp-steps { color: var(--ink-2); font-size: 0.875rem; }
+.otp-qr { border-radius: 10px; }
+.otp-key code { border-radius: 8px; background: transparent; border: 1px solid var(--line); }
+.otp-setup input { border-radius: 10px; }
+.otp-status { border-radius: 10px; }
+.otp-status.on .otp-dot { background: var(--ink); }
+#app > .narrow .step-brand { margin-bottom: 1.25rem; color: var(--ink); font-size: 1rem; font-weight: 600; }
+#app > .narrow .intro h1 { font-size: 1.375rem; font-weight: 600; }
+#app > .narrow .intro p { font-size: 0.875rem; }
