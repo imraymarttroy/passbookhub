@@ -5164,8 +5164,23 @@
     return { txs: BT.listTx(), plan: BT.getPlan(), goals: goals, currency: user.currency, today: BT.today(), store: store };
   }
 
+  /** Shares your streak and badge counts (never money) with your circle for the leaderboard. */
+  let lastGameStats = null;
+  function shareGameOn(uid) { try { return localStorage.getItem('pbh.shareGame.' + uid) !== 'off'; } catch (e) { return true; } }
+  function publishGameStats(results) {
+    const user = BT.currentUser();
+    if (!user || !shareGameOn(user.id)) return Promise.resolve(false);
+    const st = BADGES.streak(BT.listTx(), BT.today());
+    const stats = { streak: st.current, best: st.best, badges: results.filter(function (b) { return b.earned; }).length, points: BADGES.points(results) };
+    const key = user.id + JSON.stringify(stats);
+    if (key === lastGameStats) return Promise.resolve(true);
+    lastGameStats = key;
+    return SOC.saveGameStats(stats).then(function (ok) { if (!ok) lastGameStats = null; return ok; }, function () { lastGameStats = null; return false; });
+  }
+
   function celebrate(fresh) {
     if (!fresh.length) return;
+    if (window.PBH_FX) PBH_FX.celebrate();
     toast(fresh.length === 1
       ? 'Badge unlocked: ' + fresh[0].emoji + ' ' + fresh[0].name + '!'
       : fresh.length + ' badges unlocked: ' + fresh.map(function (b) { return b.emoji; }).join(' '),
@@ -5181,24 +5196,61 @@
     const summary = h('section', { class: 'bd-summary', 'aria-label': 'Badge progress' });
     const tabs = h('div', { class: 'bd-tabs', role: 'group', 'aria-label': 'Show badges' });
     const groupsEl = h('div', { class: 'bd-groups' });
+    const board = h('section', { class: 'bd-board', 'aria-labelledby': 'bd-board-h' });
+    let boardDrawn = false;
+    const soundBtn = h('button', { type: 'button', class: 'bd-action muted bd-sound', onclick: function () {
+      PBH_FX.setSound(!PBH_FX.soundOn()); paintSound(); if (PBH_FX.soundOn()) PBH_FX.sound();
+    } });
+    function paintSound() { soundBtn.textContent = PBH_FX.soundOn() ? 'Sound on' : 'Sound off'; soundBtn.setAttribute('aria-pressed', PBH_FX.soundOn() ? 'true' : 'false'); }
+    paintSound();
+
+    async function drawBoard() {
+      const head = h('div', { class: 'bd-group-head' }, h('h2', { id: 'bd-board-h' }, 'Circle leaderboard'), h('span', { class: 'small muted' }, 'Streaks and badges only, never amounts'));
+      board.replaceChildren(head, h('p', { class: 'small muted' }, 'Loading\u2026'));
+      const share = h('label', { class: 'bd-share small muted' },
+        h('input', { type: 'checkbox', checked: shareGameOn(user.id), onchange: async function (e) {
+          try { localStorage.setItem('pbh.shareGame.' + user.id, e.target.checked ? 'on' : 'off'); } catch (err) { /* storage off */ }
+          lastGameStats = null;
+          if (e.target.checked) await publishGameStats(BADGES.evaluate(badgeInput(goals, store)));
+          else await SOC.deleteGameStats().catch(function () {});
+          drawBoard();
+        } }), 'Show my progress to my circle');
+      let result;
+      try { result = await SOC.gameLeaderboard(); } catch (e) { result = { denied: true, rows: [] }; }
+      if (state.refreshGames !== draw) return;
+      if (result.denied) { board.replaceChildren(head, h('p', { class: 'small muted' }, 'The leaderboard turns on soon.')); return; }
+      const rows = result.rows;
+      const list = rows.length ? h('ol', { class: 'bd-rank' }, rows.map(function (r, i) {
+        return h('li', { class: 'bd-rank-row' + (r.me ? ' me' : '') },
+          h('span', { class: 'bd-rank-n num' }, String(i + 1)),
+          avatar(r.person, r.person.avatar, 2),
+          h('span', { class: 'bd-rank-name' }, r.me ? 'You' : (r.person.name || r.person.username || 'Someone')),
+          h('span', { class: 'bd-rank-stat num', title: 'Current streak' }, '\ud83d\udd25 ' + r.stats.streak),
+          h('span', { class: 'bd-rank-stat num', title: 'Badges' }, '\ud83c\udfc5 ' + r.stats.badges));
+      })) : null;
+      const alone = rows.filter(function (r) { return !r.me; }).length === 0;
+      board.replaceChildren.apply(board, [head, list,
+        alone ? h('p', { class: 'small muted' }, 'Add people to your circle to compare streaks. ', h('a', { href: '#circle' }, 'Find people')) : null,
+        share].filter(Boolean));
+    }
 
     function money(units) { return BT.formatMoney(units * 100, user.currency).replace(/\.00$/, ''); }
 
     function claimButton(b) {
       if (b.claim === 'self') {
-        return h('button', { type: 'button', class: 'btn bd-claim', onclick: async function () {
+        return h('button', { type: 'button', class: 'bd-action', onclick: async function () {
           const ok = await ask({ title: 'Claim ' + b.name + '?', body: 'Only claim it if you really cancelled a subscription you weren’t using. Nice one!', yes: 'I did it', no: 'Not yet' });
           if (!ok) return;
           store.claims[b.id] = Date.now();
           BADGES.save(user.id, store);
           draw();
-        } }, 'I cancelled one');
+        } }, 'Mark as done');
       }
       /* Impulse Freezer: a real 24-hour timer, kept on this device. */
       const f = store.freeze;
       if (!f) {
-        const input = h('input', { type: 'text', class: 'bd-freeze-input', maxlength: 60, placeholder: 'What do you want to buy?', 'aria-label': 'Item to freeze' });
-        return h('form', { class: 'bd-freeze', onsubmit: function (e) {
+        const input = h('input', { type: 'text', class: 'bd-inline-input', maxlength: 60, placeholder: 'Item to freeze', 'aria-label': 'Item to freeze' });
+        return h('form', { class: 'bd-inline', onsubmit: function (e) {
           e.preventDefault();
           const item = input.value.trim();
           if (!item) { input.focus(); return; }
@@ -5206,25 +5258,23 @@
           BADGES.save(user.id, store);
           toast('🧊 ' + item + ' is frozen for 24 hours.');
           draw();
-        } }, input, h('button', { type: 'submit', class: 'btn' }, 'Freeze it'));
+        } }, input, h('button', { type: 'submit', class: 'bd-action' }, 'Freeze'));
       }
       const left = f.start + BADGES.FREEZE_MS - Date.now();
-      const cancel = h('button', { type: 'button', class: 'bd-link', onclick: function () { store.freeze = null; BADGES.save(user.id, store); draw(); } }, 'Unfreeze');
+      function clear(msg) { store.freeze = null; BADGES.save(user.id, store); if (msg) toast(msg); draw(); }
       if (left > 0) {
         const hrs = Math.floor(left / 3600000), mins = Math.ceil((left % 3600000) / 60000);
-        return h('div', { class: 'bd-freeze-on' },
-          h('p', { class: 'small' }, h('strong', null, f.item), ' is frozen. ', h('span', { class: 'num' }, (hrs ? hrs + 'h ' : '') + mins + 'm'), ' to go.'),
-          cancel);
+        return h('div', { class: 'bd-inline-row' },
+          h('span', { class: 'small muted' }, f.item + ' · ', h('span', { class: 'num' }, (hrs ? hrs + 'h ' : '') + mins + 'm left')),
+          h('button', { type: 'button', class: 'bd-action muted', onclick: function () { clear(); } }, 'Unfreeze'));
       }
-      return h('div', { class: 'bd-freeze-on' },
-        h('p', { class: 'small' }, '24 hours are up for ', h('strong', null, f.item), '. Did you put the money in savings instead?'),
-        h('div', { class: 'row' },
-          h('button', { type: 'button', class: 'btn primary', onclick: function () {
+      return h('div', { class: 'bd-inline-row' },
+        h('span', { class: 'small muted' }, 'Saved it instead of buying ' + f.item + '?'),
+        h('span', { class: 'bd-actions' },
+          h('button', { type: 'button', class: 'bd-action', onclick: function () {
             store.claims.freezer = Date.now(); store.freeze = null; BADGES.save(user.id, store); draw();
-          } }, 'Yes, I saved it'),
-          h('button', { type: 'button', class: 'btn', onclick: function () {
-            store.freeze = null; BADGES.save(user.id, store); toast('No worries. Try again next time!'); draw();
-          } }, 'I bought it')));
+          } }, 'Yes'),
+          h('button', { type: 'button', class: 'bd-action muted', onclick: function () { clear('No worries. Try again next time!'); } }, 'No')));
     }
 
     function card(b) {
@@ -5254,6 +5304,7 @@
       const results = BADGES.evaluate(badgeInput(goals, store));
       celebrate(BADGES.commit(user.id, store, results));
       const all = BADGES.evaluate(badgeInput(goals, store));
+      if (goals) publishGameStats(all).then(function () { if (!boardDrawn) { boardDrawn = true; drawBoard(); } });
       const earned = all.filter(function (b) { return b.earned; }).length;
       const pct = Math.round(earned / all.length * 100);
       summary.replaceChildren(
@@ -5264,7 +5315,7 @@
       tabs.replaceChildren.apply(tabs, [['all', 'All'], ['earned', 'Earned'], ['locked', 'To unlock']].map(function (t) {
         return h('button', { type: 'button', class: 'bd-tab', 'aria-pressed': filter === t[0] ? 'true' : 'false',
           onclick: function () { filter = t[0]; draw(); } }, t[1]);
-      }));
+      }).concat([soundBtn]));
       groupsEl.replaceChildren.apply(groupsEl, BADGES.GROUPS.map(function (g) {
         const list = all.filter(function (b) { return b.group === g.id && (filter === 'all' || (filter === 'earned') === b.earned); });
         if (!list.length) return null;
@@ -5285,7 +5336,7 @@
     const page = h('div', { class: 'wide games' },
       h('h1', null, 'Games'),
       h('p', { class: 'muted bd-lead' }, 'Earn badges for good money habits. Your badges are saved on this device.'),
-      summary, tabs, groupsEl);
+      summary, board, tabs, groupsEl);
     draw();
     return page;
   }
@@ -6841,8 +6892,10 @@
     const store = BADGES.load(user.id);
     /* The first check on a device only records what you already have, so old badges don't all pop up. */
     const first = store.fresh;
-    const fresh = BADGES.commit(user.id, store, BADGES.evaluate(badgeInput(null, store)));
+    const results = BADGES.evaluate(badgeInput(null, store));
+    const fresh = BADGES.commit(user.id, store, results);
     if (!first) celebrate(fresh);
+    publishGameStats(BADGES.evaluate(badgeInput(null, store)));
   }
   BT.onTxChange(function () {
     if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();

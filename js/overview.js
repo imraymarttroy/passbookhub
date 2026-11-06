@@ -84,6 +84,19 @@ window.OVERVIEW = (function () {
     const myUid = function () { return window.FB.auth.currentUser && window.FB.auth.currentUser.uid; };
 
     const el = h('div', { class: 'ov' });
+    /* Streak: days in a row with at least one entry (like Duolingo). Your own dashboard only. */
+    const streakChip = book.mine && window.BADGES ? h('a', { class: 'mo-streak', href: '#games' }) : null;
+    function drawStreak() {
+      if (!streakChip) return;
+      const s = BADGES.streak(book.list(), BT.today());
+      const loggedToday = book.list().some(function (t) { return t.date === BT.today(); });
+      streakChip.classList.toggle('cold', s.current === 0);
+      streakChip.title = s.current ? 'Best: ' + s.best + (s.best === 1 ? ' day' : ' days') : 'Log an entry today to start a streak';
+      streakChip.replaceChildren(
+        h('span', { class: 'mo-streak-fire', 'aria-hidden': 'true' }, '\ud83d\udd25'),
+        h('span', { class: 'num' }, s.current + (s.current === 1 ? ' day' : ' days')),
+        h('span', { class: 'mo-streak-hint' }, s.current === 0 ? 'Log today to start' : loggedToday ? 'streak' : 'Log today to keep it'));
+    }
     const healthBox = h('div');
     const kpiBox = h('div', { class: 'ov-kpis' });
     const chartBox = h('div', { class: 'ov-card ov-chart-card' });
@@ -108,7 +121,7 @@ window.OVERVIEW = (function () {
       el.classList.add('bp-more');
       el.append(h('div', { class: 'mo-row bp-chart-row' }, catBox, cashBox), limBox, lowBox, goalsBox);
     } else {
-      el.append(h('div', { class: 'mo-head' }, h('h2', null, 'Overview'), h('p', { class: 'mo-sub', id: 'mo-month' })),
+      el.append(h('div', { class: 'mo-head' }, h('div', null, h('h2', null, 'Overview'), h('p', { class: 'mo-sub', id: 'mo-month' })), streakChip),
         heroBox, midBox, lowBox, cashBox);
     }
 
@@ -993,8 +1006,10 @@ window.OVERVIEW = (function () {
           const problems = SOC.validateGoal(next);
           if (problems) return problems;
           await SOC.saveGoal(owner, editing ? existing.id : null, next);
+          const reached = next.savedCents >= next.targetCents && (!editing || existing.savedCents < existing.targetCents);
+          if (reached && window.PBH_FX) { PBH_FX.celebrate(); setTimeout(function () { ctx.toast('\ud83c\udf89 Goal reached: ' + next.name + '!'); }, 50); }
           SOC.logActivity(owner, { action: editing ? 'edit' : 'add', what: 'goal', label: next.name, sub: next.kind, cents: next.savedCents, prevCents: editing ? existing.savedCents : undefined });
-          ctx.toast(editing ? 'Goal updated.' : 'Goal added.');
+          if (!reached) ctx.toast(editing ? 'Goal updated.' : 'Goal added.');
           return null;
         },
         editing ? async function () { await SOC.deleteGoal(owner, existing.id); SOC.logActivity(owner, { action: 'delete', what: 'goal', label: existing.name, sub: existing.kind, cents: existing.savedCents }); } : null);
@@ -1464,6 +1479,7 @@ window.OVERVIEW = (function () {
       readSplit();
       const c = compute();
       lastC = c;
+      drawStreak();
       const monthEl = el.querySelector('#mo-month');
       if (monthEl) monthEl.textContent = BT.monthLabel(c.month);
       if (planner) {

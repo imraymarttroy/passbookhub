@@ -445,6 +445,36 @@ window.SOC = (function () {
     return people.filter(Boolean).sort(function (a, b) { return a.name.localeCompare(b.name); });
   }
 
+  /* ---------- Games: streak and badge counts for the circle leaderboard (never money figures) ---------- */
+
+  const gameDoc = function (uid) { return F().doc(db(), 'profiles', uid, 'game', 'stats'); };
+  /** Publishes your progress. Returns false when the database rule for it isn't live yet. */
+  async function saveGameStats(stats) {
+    const clamp = function (n) { return Math.max(0, Math.min(100000, Math.round(+n || 0))); };
+    try {
+      await F().setDoc(gameDoc(me()), { streak: clamp(stats.streak), best: clamp(stats.best), badges: clamp(stats.badges), points: clamp(stats.points), updatedAt: Date.now() });
+      return true;
+    } catch (error) { if (error && error.code === 'permission-denied') return false; throw friendly(error); }
+  }
+  async function deleteGameStats() {
+    try { await F().deleteDoc(gameDoc(me())); } catch (error) { if (!error || error.code !== 'permission-denied') throw friendly(error); }
+  }
+  /** You and your circle, best first. Each row: { person, stats, me }. { denied: true } when the rule isn't live. */
+  async function gameLeaderboard() {
+    let people;
+    try { people = await circleMembers(); } catch (e) { people = []; }
+    const self = Object.assign({ id: me() }, profileCache[me()] || {});
+    const rows = await Promise.all([self].concat(people).map(function (person) {
+      return F().getDoc(gameDoc(person.id)).then(function (snap) {
+        return { person: person, stats: snap.exists() ? snap.data() : null, me: person.id === me() };
+      }, function (error) { return { person: person, stats: null, me: person.id === me(), denied: error && error.code === 'permission-denied' }; });
+    }));
+    if (rows[0].denied) return { denied: true, rows: [] };
+    return { denied: false, rows: rows.filter(function (r) { return r.stats; }).sort(function (a, b) {
+      return (b.stats.points - a.stats.points) || (b.stats.streak - a.stats.streak) || (b.stats.best - a.stats.best);
+    }) };
+  }
+
   /* ---------- Posts ---------- */
 
   function validatePost(text, visibility) {
@@ -1194,7 +1224,7 @@ window.SOC = (function () {
     ACCOUNT_TYPES: ACCOUNT_TYPES, validateAccount: validateAccount, watchAccounts: watchAccounts,
     addAccount: addAccount, updateAccount: updateAccount, deleteAccount: deleteAccount,
     DEBT_DIRS: DEBT_DIRS, GOAL_KINDS: GOAL_KINDS, validateDebt: validateDebt, validateGoal: validateGoal,
-    watchDebts: watchDebts, saveDebt: saveDebt, notifyDebt: notifyDebt, deleteDebt: deleteDebt, watchGoals: watchGoals, saveGoal: saveGoal, deleteGoal: deleteGoal,
+    watchDebts: watchDebts, saveDebt: saveDebt, notifyDebt: notifyDebt, deleteDebt: deleteDebt, watchGoals: watchGoals, saveGoal: saveGoal, deleteGoal: deleteGoal, saveGameStats: saveGameStats, deleteGameStats: deleteGameStats, gameLeaderboard: gameLeaderboard,
     ACTIVITY_WHAT: ACTIVITY_WHAT, ACTIVITY_ACTIONS: ACTIVITY_ACTIONS, logActivity: logActivity, watchActivity: watchActivity, clearActivity: clearActivity,
     watchSharedTx: watchSharedTx, addSharedTx: addSharedTx, updateSharedTx: updateSharedTx, deleteSharedTx: deleteSharedTx, restoreSharedTx: restoreSharedTx
   };

@@ -219,6 +219,19 @@ service cloud.firestore {
           && request.resource.data.updatedAt is int;
       }
 
+      // game/stats: streak and badge counts for the Games leaderboard. No money figures. Owner and circle only.
+      match /game/{docId} {
+        allow read: if signedInAs(uid) || (signedIn() && inCircle());
+        allow delete: if signedInAs(uid);
+        allow create, update: if signedInAs(uid) && docId == 'stats'
+          && request.resource.data.keys().hasOnly(['streak', 'best', 'badges', 'points', 'updatedAt'])
+          && request.resource.data.streak is int && request.resource.data.streak >= 0 && request.resource.data.streak <= 100000
+          && request.resource.data.best is int && request.resource.data.best >= 0 && request.resource.data.best <= 100000
+          && request.resource.data.badges is int && request.resource.data.badges >= 0 && request.resource.data.badges <= 100
+          && request.resource.data.points is int && request.resource.data.points >= 0 && request.resource.data.points <= 100000
+          && request.resource.data.updatedAt is int;
+      }
+
       // note/current: a short note above the profile picture. Owner and circle only.
       match /note/{docId} {
         allow read: if signedInAs(uid) || (signedIn() && inCircle());

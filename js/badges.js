@@ -198,6 +198,10 @@ window.BADGES = (function () {
   return {
     GROUPS: GROUPS, LIST: LIST, FREEZE_MS: FREEZE_MS,
     evaluate: evaluate, load: load, save: save, commit: commit,
+    /** { current, best } days in a row with at least one entry. */
+    streak: function (txs, today) { return streaks((txs || []).filter(Boolean), today || dayKey(new Date())); },
+    /** Badge points for the leaderboard: 100 per badge. */
+    points: function (results) { return results.filter(function (b) { return b.earned; }).length * 100; },
     _test: { streaks: streaks, underControl: underControl, noBoba: noBoba, avgNeeds: avgNeeds, dayKey: dayKey }
   };
 })();
