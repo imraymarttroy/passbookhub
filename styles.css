@@ -3955,7 +3955,12 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .pfb-next-body { flex: 1; min-width: 0; display: grid; gap: 0.375rem; }
 .pfb-all { color: var(--ink-2); justify-self: start; }
 .pfb-all:hover { color: var(--ink); }
-@media (max-width: 1000px) {
+@media (max-width: 1200px) {
+  .pf-layout { grid-template-columns: minmax(0, 1fr) 13.5rem; }
+  .pfb-card { padding: 1rem; }
+  .pfb-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
   .pf-layout { grid-template-columns: minmax(0, 1fr); }
   .pfb-card { position: static; }
   .pfb-list { grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); }
