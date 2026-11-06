@@ -3620,9 +3620,61 @@
 
 
   let lastOwnProfile = null;
+  /** Your earned badges, shown at the right of your own profile. Badges live on this device, so only you see them. */
+  function profileBadges() {
+    const user = BT.currentUser();
+    const store = BADGES.load(user.id);
+    let goals = null;
+    const body = h('div', { class: 'pfb-body' });
+    const count = h('span', { class: 'small muted num' });
+    const el = h('aside', { class: 'pfb-card', 'aria-labelledby': 'pfb-h' },
+      h('div', { class: 'pfb-head' }, h('h2', { id: 'pfb-h' }, 'Badges'), count),
+      body,
+      h('a', { class: 'pfb-all small', href: '#games' }, 'See all badges'));
+    function draw() {
+      celebrate(BADGES.commit(user.id, store, BADGES.evaluate(badgeInput(goals, store))));
+      const all = BADGES.evaluate(badgeInput(goals, store));
+      const earned = all.filter(function (b) { return b.earned; })
+        .sort(function (a, b) { return (b.earnedAt || 0) - (a.earnedAt || 0); });
+      count.textContent = earned.length + '/' + all.length;
+      const next = all.filter(function (b) { return !b.earned && b.progress; })
+        .sort(function (a, b) { return b.progress.have / b.progress.goal - a.progress.have / a.progress.goal; })[0];
+      const parts = [];
+      if (earned.length) {
+        parts.push(h('ul', { class: 'pfb-list' }, earned.map(function (b) {
+          return h('li', { class: 'pfb-item', title: b.name + ': ' + b.how },
+            h('span', { class: 'pfb-emoji', 'aria-hidden': 'true' }, b.emoji),
+            h('span', { class: 'pfb-name small' }, b.name));
+        })));
+      } else {
+        parts.push(h('p', { class: 'small muted' }, 'No badges yet. Log your first entry to earn \ud83d\udc23 First Step.'));
+      }
+      if (next) {
+        const pct = Math.round(next.progress.have / next.progress.goal * 100);
+        parts.push(h('div', { class: 'pfb-next' },
+          h('p', { class: 'small muted' }, 'Next up'),
+          h('div', { class: 'pfb-next-row' },
+            h('span', { class: 'pfb-emoji locked', 'aria-hidden': 'true' }, next.emoji),
+            h('div', { class: 'pfb-next-body' },
+              h('p', { class: 'small' }, next.name),
+              h('div', { class: 'bd-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct, 'aria-label': next.name + ' progress' },
+                h('span', { style: 'width:' + pct + '%' }))))));
+      }
+      body.replaceChildren.apply(body, parts);
+    }
+    const stop = SOC.watchGoals(null, function (list) { goals = list; draw(); }, function () { goals = []; draw(); });
+    draw();
+    return { el: el, draw: draw, stop: function () { if (typeof stop === 'function') stop(); } };
+  }
+
   function viewTimeline() {
     const user = BT.currentUser();
     const box = h('div', { class: 'wide pf-wide' });
+    const mainCol = h('div', { class: 'pf-layout-main' });
+    const badgesSide = profileBadges();
+    box.append(h('div', { class: 'pf-layout' }, mainCol, badgesSide.el));
+    state.refreshProfileBadges = badgesSide.draw;
+    (function () { const prev = state.cleanup; state.cleanup = function () { badgesSide.stop(); state.refreshProfileBadges = null; if (prev) prev(); }; })();
     let shownKey = null;
     function paint(p) {
       const me = BT.currentUser();
@@ -3630,7 +3682,7 @@
       const key = JSON.stringify([person.name, person.username, person.avatar ? person.avatar.length : 0, person.bio, person.education || [], person.work || []]);
       if (key === shownKey) return;
       shownKey = key;
-      box.replaceChildren(profilePage(person, {
+      mainCol.replaceChildren(profilePage(person, {
           mine: true,
           onEdit: function () { editProfile(redrawAll); },
           actions: [
@@ -6785,6 +6837,7 @@
     const user = BT.currentUser();
     if (!user || !user.profileDone || !window.BADGES) return;
     if (state.view === 'games' && state.refreshGames) { state.refreshGames(); return; }
+    if (state.view === 'profile' && state.refreshProfileBadges) { state.refreshProfileBadges(); return; }
     const store = BADGES.load(user.id);
     /* The first check on a device only records what you already have, so old badges don't all pop up. */
     const first = store.fresh;

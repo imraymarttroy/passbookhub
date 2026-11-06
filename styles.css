@@ -3936,3 +3936,27 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .bd-freeze-on { margin-top: 0.625rem; display: grid; gap: 0.375rem; justify-items: start; }
 .bd-freeze-on .btn { font-size: 0.8125rem; padding: 0.375rem 0.75rem; }
 .bd-link { font: inherit; font-size: 0.75rem; color: var(--ink-2); background: none; border: 0; padding: 0; text-decoration: underline; cursor: pointer; }
+
+/* Profile: earned badges in a column at the right */
+.pf-layout { display: grid; grid-template-columns: minmax(0, 1fr) 17rem; gap: var(--gap, 1rem); align-items: start; }
+.pf-layout-main { min-width: 0; }
+.pfb-card { position: sticky; top: 1rem; border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; display: grid; gap: 0.875rem; }
+.pfb-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.pfb-head h2 { font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.pfb-body { display: grid; gap: 1rem; }
+.pfb-body p { margin: 0; }
+.pfb-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem 0.5rem; }
+.pfb-item { display: grid; justify-items: center; gap: 0.3rem; text-align: center; min-width: 0; cursor: default; }
+.pfb-emoji { width: 2.75rem; height: 2.75rem; border-radius: 12px; display: grid; place-items: center; font-size: 1.4rem; background: var(--brand); }
+.pfb-emoji.locked { background: var(--wash); filter: grayscale(1); opacity: 0.5; flex: none; width: 2.25rem; height: 2.25rem; font-size: 1.1rem; }
+.pfb-name { line-height: 1.2; font-size: 0.6875rem; color: var(--ink-2); overflow-wrap: anywhere; }
+.pfb-next { padding-top: 0.875rem; border-top: 1px solid var(--line); display: grid; gap: 0.5rem; }
+.pfb-next-row { display: flex; align-items: center; gap: 0.625rem; }
+.pfb-next-body { flex: 1; min-width: 0; display: grid; gap: 0.375rem; }
+.pfb-all { color: var(--ink-2); justify-self: start; }
+.pfb-all:hover { color: var(--ink); }
+@media (max-width: 1000px) {
+  .pf-layout { grid-template-columns: minmax(0, 1fr); }
+  .pfb-card { position: static; }
+  .pfb-list { grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr)); }
+}
