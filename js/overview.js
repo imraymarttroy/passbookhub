@@ -85,7 +85,7 @@ window.OVERVIEW = (function () {
 
     const el = h('div', { class: 'ov' });
     /* Streak: days in a row with at least one entry (like Duolingo). Your own dashboard only. */
-    const streakChip = book.mine && window.BADGES ? h('a', { class: 'mo-streak', href: '#games' }) : null;
+    const streakChip = book.mine && window.BADGES ? h('a', { class: 'mo-streak', href: '#stash-streak' }) : null;
     function drawStreak() {
       if (!streakChip) return;
       const s = BADGES.streak(book.list(), BT.today());

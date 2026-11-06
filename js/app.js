@@ -271,13 +271,13 @@
     if (wanted === 'dashboard') return 'dashboard';
     if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
     if (wanted === 'budget-plan') return 'budget-plan';
-    if (wanted === 'games') return 'games';
+    if (wanted === 'games' || wanted === 'stash-streak') return 'stash-streak';
     /* After signing in (or with no page in the address), start on the profile. */
     return ['feed', 'profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'games', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -290,7 +290,7 @@
     'budget-plan': { title: 'Budget & Transactions', render: viewDashboard },
     feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
-    games: { title: 'Games', render: viewGames },
+    'stash-streak': { title: 'Stash & Streak', render: viewGames },
     profile: { title: 'Profile', render: viewTimeline },
     person: { title: 'Profile', render: viewPerson },
     shared: { title: 'Dashboard', render: viewShared },
@@ -2124,6 +2124,36 @@
     return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
   }
 
+  /* Games: a channel like Dashboard, one sub-tab per game. Stash & Streak is the badges game. */
+  const GAME_CHANNEL = [['stash-streak', 'Stash & Streak']];
+  function gamesChannel(current) {
+    const here = GAME_CHANNEL.some(function (c) { return c[0] === current; });
+    let open = here;
+    try { if (!open) open = localStorage.getItem('pbh.gamesOpen') !== '0'; } catch (e) { open = true; }
+    const sub = h('ul', { class: 'nav-sub', id: 'nav-sub-games', hidden: !open },
+      GAME_CHANNEL.map(function (c) {
+        return h('li', null, h('a', { class: 'nav-sub-item', href: '#' + c[0], 'aria-current': current === c[0] ? 'page' : null },
+          h('span', { class: 'nav-hash', 'aria-hidden': 'true' }, '#'), h('span', { class: 'nav-label' }, c[1])));
+      }));
+    const chev = h('button', {
+      type: 'button', class: 'nav-chev' + (open ? ' open' : ''), 'aria-controls': 'nav-sub-games',
+      'aria-expanded': open ? 'true' : 'false', 'aria-label': open ? 'Hide games' : 'Show games',
+      onclick: function () { setOpen(sub.hidden); }
+    }, icon('down'));
+    function setOpen(on) {
+      sub.hidden = !on;
+      chev.classList.toggle('open', on);
+      chev.setAttribute('aria-expanded', on ? 'true' : 'false');
+      chev.setAttribute('aria-label', on ? 'Hide games' : 'Show games');
+      try { localStorage.setItem('pbh.gamesOpen', on ? '1' : '0'); } catch (e) { /* storage off */ }
+    }
+    const link = h('a', {
+      class: 'nav-item', href: '#' + GAME_CHANNEL[0][0], title: 'Games', 'aria-current': here ? 'page' : null,
+      onclick: function () { setOpen(true); }
+    }, navIcon('games'), h('span', { class: 'nav-label' }, 'Games'));
+    return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
+  }
+
   /* Community and Blog: locked until there is content for them. */
   const LOCKED_NAV = {
     Community: '<circle cx="7.5" cy="7" r="2.5"/><circle cx="13.5" cy="8" r="2"/><path d="M3 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12.5 12.2c1.9-.2 3.6.9 4.2 3.3"/>',
@@ -2273,7 +2303,7 @@
           lockedItem('Community'),
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
-          item('games', '#games', 'Games'),
+          gamesChannel(current),
           h('li', { class: 'nav-signout-li' }, signOutButton()))),
       h('div', { class: 'sidebar-foot' }, onlineBadge(), installButton(), signOutIcon(), versionButton(' side-version')));
     drawBadges();
@@ -3636,7 +3666,7 @@
     const el = h('aside', { class: 'pfb-card', 'aria-labelledby': 'pfb-h' },
       h('div', { class: 'pfb-head' }, h('h2', { id: 'pfb-h' }, 'Badges'), count),
       body,
-      h('a', { class: 'pfb-all small', href: '#games' }, 'See all badges'));
+      h('a', { class: 'pfb-all small', href: '#stash-streak' }, 'See all badges'));
     function draw() {
       celebrate(BADGES.commit(user.id, store, BADGES.evaluate(badgeInput({ goals: goals }, store))));
       const all = BADGES.evaluate(badgeInput({ goals: goals }, store));
@@ -5204,7 +5234,7 @@
     toast(fresh.length === 1
       ? 'Badge unlocked: ' + fresh[0].emoji + ' ' + fresh[0].name + '!'
       : fresh.length + ' badges unlocked: ' + fresh.map(function (b) { return b.emoji; }).join(' '),
-      state.view === 'games' ? null : { label: 'See badges', run: function () { location.hash = '#games'; } });
+      state.view === 'stash-streak' ? null : { label: 'See badges', run: function () { location.hash = '#stash-streak'; } });
   }
 
   function viewGames() {
@@ -5379,8 +5409,9 @@
     tick = setInterval(function () { if (store.freeze) draw(); }, 60 * 1000);
     state.cleanup = function () { if (typeof stop === 'function') stop(); clearInterval(tick); state.refreshGames = null; };
     const page = h('div', { class: 'wide games' },
-      h('h1', null, 'Games'),
-      h('p', { class: 'muted bd-lead' }, 'Earn badges for good money habits. Your badges are saved on this device.'),
+      h('p', { class: 'bd-kicker' }, 'Games'),
+      h('h1', null, 'Stash & Streak'),
+      h('p', { class: 'muted bd-lead' }, 'Earn badges for good money habits, keep your streak alive and race your circle. Your badges are saved on this device.'),
       summary, board, tabs, groupsEl);
     draw();
     return page;
@@ -6942,7 +6973,7 @@
   function checkBadges() {
     const user = BT.currentUser();
     if (!user || !user.profileDone || !window.BADGES) return;
-    if (state.view === 'games' && state.refreshGames) { state.refreshGames(); return; }
+    if (state.view === 'stash-streak' && state.refreshGames) { state.refreshGames(); return; }
     if (state.view === 'profile' && state.refreshProfileBadges) { state.refreshProfileBadges(); return; }
     const store = BADGES.load(user.id);
     /* The first check on a device only records what you already have, so old badges don't all pop up. */

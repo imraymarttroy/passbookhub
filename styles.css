@@ -4010,3 +4010,4 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .bd-card.secret .bd-emoji { font-size: 1rem; font-weight: 600; color: var(--ink-2); filter: none; opacity: 1; }
 .bd-more { display: block; margin-top: 0.75rem; }
 .bd-ring { cursor: default; user-select: none; }
+.bd-kicker { margin: 0 0 0.125rem; font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
