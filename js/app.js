@@ -5230,7 +5230,9 @@
       })) : null;
       const alone = rows.filter(function (r) { return !r.me; }).length === 0;
       board.replaceChildren.apply(board, [head, list,
-        alone ? h('p', { class: 'small muted' }, 'Add people to your circle to compare streaks. ', h('a', { href: '#circle' }, 'Find people')) : null,
+        alone ? (result.circleSize
+          ? h('p', { class: 'small muted' }, 'Your circle shows up here once they open Games.')
+          : h('p', { class: 'small muted' }, 'Add people to your circle to compare streaks. ', h('a', { href: '#circle' }, 'Find people'))) : null,
         share].filter(Boolean));
     }
 

@@ -470,7 +470,7 @@ window.SOC = (function () {
       }, function (error) { return { person: person, stats: null, me: person.id === me(), denied: error && error.code === 'permission-denied' }; });
     }));
     if (rows[0].denied) return { denied: true, rows: [] };
-    return { denied: false, rows: rows.filter(function (r) { return r.stats; }).sort(function (a, b) {
+    return { denied: false, circleSize: people.length, rows: rows.filter(function (r) { return r.stats; }).sort(function (a, b) {
       return (b.stats.points - a.stats.points) || (b.stats.streak - a.stats.streak) || (b.stats.best - a.stats.best);
     }) };
   }
