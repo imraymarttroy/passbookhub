@@ -12,7 +12,8 @@
     editingId: null,
     notice: null,
     resetEmail: null,
-    refreshDashboard: null
+    refreshDashboard: null,
+    refreshGames: null
   };
   let toastTimer = null;
 
@@ -270,12 +271,13 @@
     if (wanted === 'dashboard') return 'dashboard';
     if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
     if (wanted === 'budget-plan') return 'budget-plan';
+    if (wanted === 'games') return 'games';
     /* After signing in (or with no page in the address), start on the profile. */
     return ['feed', 'profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'games', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -288,6 +290,7 @@
     'budget-plan': { title: 'Budget & Transactions', render: viewDashboard },
     feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
+    games: { title: 'Games', render: viewGames },
     profile: { title: 'Profile', render: viewTimeline },
     person: { title: 'Profile', render: viewPerson },
     shared: { title: 'Dashboard', render: viewShared },
@@ -1690,6 +1693,7 @@
     circle: '<circle cx="7" cy="7.5" r="2.75"/><circle cx="13.5" cy="8" r="2.25"/><path d="M2.5 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12 12.2c2.3-.4 4.5.9 5.2 3.8"/>',
     messages: '<path d="M3.5 5.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-3.5 3v-3a2 2 0 0 1-2-2z"/>',
     feed: '<rect x="3" y="3" width="14" height="14" rx="2.5"/><path d="M6.5 7h7M6.5 10h7M6.5 13h4"/>',
+    games: '<path d="M6.5 6.5h7a4 4 0 0 1 4 4v1a3 3 0 0 1-5.3 1.9l-.7-.9h-3l-.7.9A3 3 0 0 1 2.5 11.5v-1a4 4 0 0 1 4-4z"/><path d="M6.5 9v2.5M5.25 10.25h2.5M13 9.5h.01M14.5 11h.01"/>',
     notifications: '<path d="M5 13.5V9a5 5 0 0 1 10 0v4.5l1.5 1.5h-13z"/><path d="M8.5 17.5a1.6 1.6 0 0 0 3 0"/>',
     settings: '<path d="M8.7 2.5h2.6l.45 2.05a5.6 5.6 0 0 1 1.5.87l2-.66 1.3 2.25-1.56 1.4a5.7 5.7 0 0 1 0 1.73l1.56 1.4-1.3 2.25-2-.66a5.6 5.6 0 0 1-1.5.87l-.45 2.05H8.7l-.45-2.05a5.6 5.6 0 0 1-1.5-.87l-2 .66-1.3-2.25 1.56-1.4a5.7 5.7 0 0 1 0-1.73l-1.56-1.4 1.3-2.25 2 .66a5.6 5.6 0 0 1 1.5-.87z"/><circle cx="10" cy="10" r="2.4"/>',
     signout: '<path d="M8 4H4.5v12H8M12 6.5 15.5 10 12 13.5M15.5 10H7.5"/>'
@@ -2263,7 +2267,7 @@
           lockedItem('Community'),
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
-          lockedItem('Games'),
+          item('games', '#games', 'Games'),
           h('li', { class: 'nav-signout-li' }, signOutButton()))),
       h('div', { class: 'sidebar-foot' }, onlineBadge(), installButton(), signOutIcon(), versionButton(' side-version')));
     drawBadges();
@@ -5101,6 +5105,139 @@
       (function () { state.drawNotes = draw; return null; })());
   }
 
+  /* ---------- Games: badges ---------- */
+
+  function badgeInput(goals, store) {
+    const user = BT.currentUser();
+    return { txs: BT.listTx(), plan: BT.getPlan(), goals: goals, currency: user.currency, today: BT.today(), store: store };
+  }
+
+  function celebrate(fresh) {
+    if (!fresh.length) return;
+    toast(fresh.length === 1
+      ? 'Badge unlocked: ' + fresh[0].emoji + ' ' + fresh[0].name + '!'
+      : fresh.length + ' badges unlocked: ' + fresh.map(function (b) { return b.emoji; }).join(' '),
+      state.view === 'games' ? null : { label: 'See badges', run: function () { location.hash = '#games'; } });
+  }
+
+  function viewGames() {
+    const user = BT.currentUser();
+    const store = BADGES.load(user.id);
+    let goals = null;
+    let filter = 'all';
+    let tick = null;
+    const summary = h('section', { class: 'bd-summary', 'aria-label': 'Badge progress' });
+    const tabs = h('div', { class: 'bd-tabs', role: 'group', 'aria-label': 'Show badges' });
+    const groupsEl = h('div', { class: 'bd-groups' });
+
+    function money(units) { return BT.formatMoney(units * 100, user.currency).replace(/\.00$/, ''); }
+
+    function claimButton(b) {
+      if (b.claim === 'self') {
+        return h('button', { type: 'button', class: 'btn bd-claim', onclick: async function () {
+          const ok = await ask({ title: 'Claim ' + b.name + '?', body: 'Only claim it if you really cancelled a subscription you weren’t using. Nice one!', yes: 'I did it', no: 'Not yet' });
+          if (!ok) return;
+          store.claims[b.id] = Date.now();
+          BADGES.save(user.id, store);
+          draw();
+        } }, 'I cancelled one');
+      }
+      /* Impulse Freezer: a real 24-hour timer, kept on this device. */
+      const f = store.freeze;
+      if (!f) {
+        const input = h('input', { type: 'text', class: 'bd-freeze-input', maxlength: 60, placeholder: 'What do you want to buy?', 'aria-label': 'Item to freeze' });
+        return h('form', { class: 'bd-freeze', onsubmit: function (e) {
+          e.preventDefault();
+          const item = input.value.trim();
+          if (!item) { input.focus(); return; }
+          store.freeze = { start: Date.now(), item: item.slice(0, 60) };
+          BADGES.save(user.id, store);
+          toast('🧊 ' + item + ' is frozen for 24 hours.');
+          draw();
+        } }, input, h('button', { type: 'submit', class: 'btn' }, 'Freeze it'));
+      }
+      const left = f.start + BADGES.FREEZE_MS - Date.now();
+      const cancel = h('button', { type: 'button', class: 'bd-link', onclick: function () { store.freeze = null; BADGES.save(user.id, store); draw(); } }, 'Unfreeze');
+      if (left > 0) {
+        const hrs = Math.floor(left / 3600000), mins = Math.ceil((left % 3600000) / 60000);
+        return h('div', { class: 'bd-freeze-on' },
+          h('p', { class: 'small' }, h('strong', null, f.item), ' is frozen. ', h('span', { class: 'num' }, (hrs ? hrs + 'h ' : '') + mins + 'm'), ' to go.'),
+          cancel);
+      }
+      return h('div', { class: 'bd-freeze-on' },
+        h('p', { class: 'small' }, '24 hours are up for ', h('strong', null, f.item), '. Did you put the money in savings instead?'),
+        h('div', { class: 'row' },
+          h('button', { type: 'button', class: 'btn primary', onclick: function () {
+            store.claims.freezer = Date.now(); store.freeze = null; BADGES.save(user.id, store); draw();
+          } }, 'Yes, I saved it'),
+          h('button', { type: 'button', class: 'btn', onclick: function () {
+            store.freeze = null; BADGES.save(user.id, store); toast('No worries. Try again next time!'); draw();
+          } }, 'I bought it')));
+    }
+
+    function card(b) {
+      const status = b.earned
+        ? h('p', { class: 'bd-status good small' }, icon('check'), b.earnedAt ? 'Earned ' + new Date(b.earnedAt).toLocaleDateString(I18N.locale, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Earned')
+        : b.waiting ? h('p', { class: 'bd-status small muted' }, 'Checking your goals…') : null;
+      let bar = null;
+      if (b.progress) {
+        const pct = Math.round(b.progress.have / b.progress.goal * 100);
+        const label = b.progress.money ? money(b.progress.have) + ' of ' + money(b.progress.goal) : b.progress.have + ' of ' + b.progress.goal;
+        bar = h('div', { class: 'bd-progress' },
+          h('div', { class: 'bd-bar', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct, 'aria-label': b.name + ' progress' },
+            h('span', { style: 'width:' + pct + '%' })),
+          h('span', { class: 'small muted num' }, label));
+      }
+      return h('li', { class: 'bd-card' + (b.earned ? ' earned' : ' locked') },
+        h('span', { class: 'bd-emoji', 'aria-hidden': 'true' }, b.emoji),
+        h('div', { class: 'bd-body' },
+          h('h3', null, b.name, b.earned ? null : h('span', { class: 'vh' }, ' (not earned yet)')),
+          h('p', { class: 'small muted' }, b.how),
+          bar, status,
+          !b.earned && b.claim ? claimButton(b) : null));
+    }
+
+    function draw() {
+      if (state.refreshGames !== draw) return;
+      const results = BADGES.evaluate(badgeInput(goals, store));
+      celebrate(BADGES.commit(user.id, store, results));
+      const all = BADGES.evaluate(badgeInput(goals, store));
+      const earned = all.filter(function (b) { return b.earned; }).length;
+      const pct = Math.round(earned / all.length * 100);
+      summary.replaceChildren(
+        h('div', { class: 'bd-ring', style: '--p:' + pct, 'aria-hidden': 'true' }, h('span', { class: 'num' }, earned + '/' + all.length)),
+        h('div', null,
+          h('h2', null, earned === all.length ? 'Every badge collected!' : earned ? 'You’ve earned ' + earned + ' of ' + all.length + ' badges' : 'Start collecting badges'),
+          h('p', { class: 'small muted' }, earned === all.length ? 'You’re a PassbookHub legend.' : 'Badges unlock as you log entries, stick to your budget and grow your savings goals.')));
+      tabs.replaceChildren.apply(tabs, [['all', 'All'], ['earned', 'Earned'], ['locked', 'To unlock']].map(function (t) {
+        return h('button', { type: 'button', class: 'bd-tab', 'aria-pressed': filter === t[0] ? 'true' : 'false',
+          onclick: function () { filter = t[0]; draw(); } }, t[1]);
+      }));
+      groupsEl.replaceChildren.apply(groupsEl, BADGES.GROUPS.map(function (g) {
+        const list = all.filter(function (b) { return b.group === g.id && (filter === 'all' || (filter === 'earned') === b.earned); });
+        if (!list.length) return null;
+        return h('section', { class: 'bd-group', 'aria-labelledby': 'bd-' + g.id },
+          h('div', { class: 'bd-group-head' },
+            h('h2', { id: 'bd-' + g.id }, g.label),
+            h('span', { class: 'small muted num' }, all.filter(function (b) { return b.group === g.id && b.earned; }).length + '/' + all.filter(function (b) { return b.group === g.id; }).length)),
+          h('p', { class: 'small muted' }, g.hint),
+          h('ul', { class: 'bd-list' }, list.map(card)));
+      }).filter(Boolean));
+      if (!groupsEl.children.length) groupsEl.replaceChildren(h('p', { class: 'empty' }, filter === 'earned' ? 'No badges yet. Log your first entry to earn 🐣 First Step.' : 'You’ve unlocked every badge!'));
+    }
+
+    const stop = SOC.watchGoals(null, function (list) { goals = list; draw(); }, function () { goals = []; draw(); });
+    state.refreshGames = draw;
+    tick = setInterval(function () { if (store.freeze) draw(); }, 60 * 1000);
+    state.cleanup = function () { if (typeof stop === 'function') stop(); clearInterval(tick); state.refreshGames = null; };
+    const page = h('div', { class: 'wide games' },
+      h('h1', null, 'Games'),
+      h('p', { class: 'muted bd-lead' }, 'Earn badges for good money habits. Your badges are saved on this device.'),
+      summary, tabs, groupsEl);
+    draw();
+    return page;
+  }
+
   /* ---------- Dashboard ---------- */
 
   /** Your own budget, read and written through BT. */
@@ -6643,11 +6780,24 @@
     const user = BT.currentUser();
     if (t && user) SOC.syncTrustCurrency(user.currency);
   });
+  /* New badges pop a toast wherever you are. Goal-based badges are checked on the Games page. */
+  function checkBadges() {
+    const user = BT.currentUser();
+    if (!user || !user.profileDone || !window.BADGES) return;
+    if (state.view === 'games' && state.refreshGames) { state.refreshGames(); return; }
+    const store = BADGES.load(user.id);
+    /* The first check on a device only records what you already have, so old badges don't all pop up. */
+    const first = store.fresh;
+    const fresh = BADGES.commit(user.id, store, BADGES.evaluate(badgeInput(null, store)));
+    if (!first) celebrate(fresh);
+  }
   BT.onTxChange(function () {
     if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
+    checkBadges();
   });
   BT.onPlanChange(function () {
     if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
+    checkBadges();
   });
   /* ---------- New-alert pop-up, bottom right ---------- */
   var seenNotes = null;
