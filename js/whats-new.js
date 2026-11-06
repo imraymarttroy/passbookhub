@@ -15,14 +15,14 @@ window.WHATS_NEW = (function () {
    * Bump it with every release and update CHANGES below. A new version shows the tour once more,
    * even for people who ticked "Don't show this again".
    */
-  const APP_VERSION = '2.4.0';
+  const APP_VERSION = '2.5.0';
   /* The full tour on login only comes back when this changes; small updates use the minimal popup instead. */
   const FEATURES_VERSION = '2.0.0';
 
   /* What changed in APP_VERSION, shown in the minimal update popup (version button in the sidebar). */
   const UPDATE = {
     en: { title: 'What\u2019s new', close: 'Close', ok: 'Got it', items: [
-      ['Games: badges', '12 badges to collect for logging streaks, staying on budget and growing your savings goals. Open Games in the sidebar.'],
+      ['Games: 120 badges', 'Collect badges for logging streaks, staying on budget and saving. Streak counter on your Overview, confetti for every win, and a circle leaderboard.'],
       ['Budget & Transactions', 'One page for your split, salary auto-split, categories with icons and limits, spending charts, limits vs actuals, recent activity, bills, goals and every transaction.'],
       ['Alert pop-ups', 'New alerts now pop up at the bottom right.'],
       ['New Overview', 'Safe-to-spend, 50/30/20 progress, budget limits, bills and cashflow on one screen.'],
@@ -31,7 +31,7 @@ window.WHATS_NEW = (function () {
       ['Coming soon', 'Community and Blog are in the sidebar, locked for now.']
     ] },
     fil: { title: 'Ano ang bago', close: 'Isara', ok: 'Sige', items: [
-      ['Games: badges', '12 badges na puwedeng kolektahin sa tuloy-tuloy na pag-log, pagsunod sa budget at pagpapalaki ng savings goals. Buksan ang Games sa sidebar.'],
+      ['Games: 120 badges', 'Mangolekta ng badges sa tuloy-tuloy na pag-log, pagsunod sa budget at pag-iipon. May streak counter sa Overview, confetti sa bawat panalo at leaderboard ng circle mo.'],
       ['Budget & Transactions', 'Iisang page na para sa hatian mo, auto-split ng sweldo, mga category na may icon at limit, charts ng gastos, limits vs actual, recent, bayarin, goals at lahat ng transaction.'],
       ['Alert pop-ups', 'Lumalabas na sa kanang ibaba ang mga bagong alert.'],
       ['Bagong Overview', 'Safe-to-spend, 50/30/20 progress, budget limits, bayarin at cashflow sa iisang screen.'],

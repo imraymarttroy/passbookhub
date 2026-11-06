@@ -321,6 +321,11 @@
     state.refreshMessages = null;
     document.title = (view === 'signin' || view === 'signup') ? 'PassbookHub' : VIEWS[view].title + ' · PassbookHub';
     document.body.classList.toggle('auth-body', view === 'signin' || view === 'signup');
+    if (SHELL_VIEWS.indexOf(view) !== -1 && BT.currentUser()) {
+      trackBadge('open');
+      if (['dashboard', 'budget-plan', 'feed', 'messages', 'profile'].indexOf(view) !== -1) trackBadge('view', view);
+      if (currentTheme() === 'dark') trackBadge('dark');
+    }
     const content = VIEWS[view].render(view);
     if (SHELL_VIEWS.indexOf(view) !== -1) {
       startSocial();
@@ -329,6 +334,7 @@
       root.replaceChildren(content);
     }
     dock.sync(SHELL_VIEWS.indexOf(view) !== -1);
+    if (SHELL_VIEWS.indexOf(view) !== -1) setTimeout(checkBadges, 0);
     if (changed) {
       window.scrollTo(0, 0);
       const heading = root.querySelector('h1');
@@ -3632,8 +3638,8 @@
       body,
       h('a', { class: 'pfb-all small', href: '#games' }, 'See all badges'));
     function draw() {
-      celebrate(BADGES.commit(user.id, store, BADGES.evaluate(badgeInput(goals, store))));
-      const all = BADGES.evaluate(badgeInput(goals, store));
+      celebrate(BADGES.commit(user.id, store, BADGES.evaluate(badgeInput({ goals: goals }, store))));
+      const all = BADGES.evaluate(badgeInput({ goals: goals }, store));
       const earned = all.filter(function (b) { return b.earned; })
         .sort(function (a, b) { return (b.earnedAt || 0) - (a.earnedAt || 0); });
       count.textContent = earned.length + '/' + all.length;
@@ -5151,6 +5157,7 @@
     draw(SOC.notifications());
     trustWatchers.push(function () { if (!list.isConnected) return false; draw(SOC.notifications()); });
     setTimeout(function () { SOC.markAllRead().catch(function () {}); }, 1500);
+    if (SOC.notifications().length) trackBadge('alerts');
     return h('div', { class: 'wide' },
       h('h1', { style: 'margin-bottom:1.25rem' }, 'Alerts'),
       list,
@@ -5159,9 +5166,22 @@
 
   /* ---------- Games: badges ---------- */
 
-  function badgeInput(goals, store) {
+  /** data: { goals, debts, accounts, circleSize, topOfCircle }, each null or missing until loaded. */
+  function badgeInput(data, store) {
     const user = BT.currentUser();
-    return { txs: BT.listTx(), plan: BT.getPlan(), goals: goals, currency: user.currency, today: BT.today(), store: store };
+    const d = data || {};
+    /* Events are written by BADGES.track elsewhere, so read the latest ones each time. */
+    store.events = BADGES.load(user.id).events;
+    return {
+      txs: BT.listTx(), plan: BT.getPlan(), goals: d.goals || null, debts: d.debts || null, accounts: d.accounts || null,
+      circleSize: d.circleSize === undefined ? null : d.circleSize, topOfCircle: !!d.topOfCircle,
+      user: user, mfa: BT.mfaOn(), currency: user.currency, today: BT.today(), store: store
+    };
+  }
+  function trackBadge(name, value) {
+    const user = BT.currentUser();
+    if (!user || !user.profileDone || !window.BADGES) return;
+    BADGES.track(user.id, name, value);
   }
 
   /** Shares your streak and badge counts (never money) with your circle for the leaderboard. */
@@ -5190,9 +5210,13 @@
   function viewGames() {
     const user = BT.currentUser();
     const store = BADGES.load(user.id);
+    const data = { goals: null, debts: null, accounts: null };
     let goals = null;
     let filter = 'all';
     let tick = null;
+    const openGroups = {};
+    let eggClicks = 0;
+    trackBadge('view', 'games');
     const summary = h('section', { class: 'bd-summary', 'aria-label': 'Badge progress' });
     const tabs = h('div', { class: 'bd-tabs', role: 'group', 'aria-label': 'Show badges' });
     const groupsEl = h('div', { class: 'bd-groups' });
@@ -5211,7 +5235,7 @@
         h('input', { type: 'checkbox', checked: shareGameOn(user.id), onchange: async function (e) {
           try { localStorage.setItem('pbh.shareGame.' + user.id, e.target.checked ? 'on' : 'off'); } catch (err) { /* storage off */ }
           lastGameStats = null;
-          if (e.target.checked) await publishGameStats(BADGES.evaluate(badgeInput(goals, store)));
+          if (e.target.checked) await publishGameStats(BADGES.evaluate(badgeInput(data, store)));
           else await SOC.deleteGameStats().catch(function () {});
           drawBoard();
         } }), 'Show my progress to my circle');
@@ -5220,6 +5244,9 @@
       if (state.refreshGames !== draw) return;
       if (result.denied) { board.replaceChildren(head, h('p', { class: 'small muted' }, 'The leaderboard turns on soon.')); return; }
       const rows = result.rows;
+      const circleSize = result.circleSize || 0;
+      const top = rows.length >= 2 && rows[0].me;
+      if (data.circleSize !== circleSize || data.topOfCircle !== top) { data.circleSize = circleSize; data.topOfCircle = top; setTimeout(draw, 0); }
       const list = rows.length ? h('ol', { class: 'bd-rank' }, rows.map(function (r, i) {
         return h('li', { class: 'bd-rank-row' + (r.me ? ' me' : '') },
           h('span', { class: 'bd-rank-n num' }, String(i + 1)),
@@ -5282,7 +5309,12 @@
     function card(b) {
       const status = b.earned
         ? h('p', { class: 'bd-status good small' }, icon('check'), b.earnedAt ? 'Earned ' + new Date(b.earnedAt).toLocaleDateString(I18N.locale, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Earned')
-        : b.waiting ? h('p', { class: 'bd-status small muted' }, 'Checking your goals…') : null;
+        : b.waiting ? h('p', { class: 'bd-status small muted' }, 'Checking\u2026') : null;
+      if (b.kind === 'secret' && !b.earned) {
+        return h('li', { class: 'bd-card locked secret' },
+          h('span', { class: 'bd-emoji', 'aria-hidden': 'true' }, '?'),
+          h('div', { class: 'bd-body' }, h('h3', null, 'Secret badge'), h('p', { class: 'small muted' }, 'Something on this page is hiding a surprise.')));
+      }
       let bar = null;
       if (b.progress) {
         const pct = Math.round(b.progress.have / b.progress.goal * 100);
@@ -5303,14 +5335,18 @@
 
     function draw() {
       if (state.refreshGames !== draw) return;
-      const results = BADGES.evaluate(badgeInput(goals, store));
+      data.goals = goals;
+      const results = BADGES.evaluate(badgeInput(data, store));
       celebrate(BADGES.commit(user.id, store, results));
-      const all = BADGES.evaluate(badgeInput(goals, store));
+      const all = BADGES.evaluate(badgeInput(data, store));
       if (goals) publishGameStats(all).then(function () { if (!boardDrawn) { boardDrawn = true; drawBoard(); } });
       const earned = all.filter(function (b) { return b.earned; }).length;
       const pct = Math.round(earned / all.length * 100);
       summary.replaceChildren(
-        h('div', { class: 'bd-ring', style: '--p:' + pct, 'aria-hidden': 'true' }, h('span', { class: 'num' }, earned + '/' + all.length)),
+        h('div', { class: 'bd-ring', style: '--p:' + pct, 'aria-hidden': 'true', onclick: function () {
+          /* Unicorn Sighting: tap the ring 7 times. */
+          if (++eggClicks === 7) { trackBadge('egg'); draw(); }
+        } }, h('span', { class: 'num' }, earned + '/' + all.length)),
         h('div', null,
           h('h2', null, earned === all.length ? 'Every badge collected!' : earned ? 'You’ve earned ' + earned + ' of ' + all.length + ' badges' : 'Start collecting badges'),
           h('p', { class: 'small muted' }, earned === all.length ? 'You’re a PassbookHub legend.' : 'Badges unlock as you log entries, stick to your budget and grow your savings goals.')));
@@ -5326,12 +5362,19 @@
             h('h2', { id: 'bd-' + g.id }, g.label),
             h('span', { class: 'small muted num' }, all.filter(function (b) { return b.group === g.id && b.earned; }).length + '/' + all.filter(function (b) { return b.group === g.id; }).length)),
           h('p', { class: 'small muted' }, g.hint),
-          h('ul', { class: 'bd-list' }, list.map(card)));
+          h('ul', { class: 'bd-list' }, (openGroups[g.id] ? list : list.slice(0, 6)).map(card)),
+          list.length > 6 ? h('button', { type: 'button', class: 'bd-action muted bd-more', onclick: function () { openGroups[g.id] = !openGroups[g.id]; draw(); } },
+            openGroups[g.id] ? 'Show less' : 'Show all ' + list.length) : null);
       }).filter(Boolean));
       if (!groupsEl.children.length) groupsEl.replaceChildren(h('p', { class: 'empty' }, filter === 'earned' ? 'No badges yet. Log your first entry to earn 🐣 First Step.' : 'You’ve unlocked every badge!'));
     }
 
-    const stop = SOC.watchGoals(null, function (list) { goals = list; draw(); }, function () { goals = []; draw(); });
+    const stops = [
+      SOC.watchGoals(null, function (list) { goals = list; draw(); }, function () { goals = []; draw(); }),
+      SOC.watchDebts(null, function (list) { data.debts = list; draw(); }, function () { data.debts = []; draw(); }),
+      SOC.watchAccounts(null, function (list) { data.accounts = list; draw(); }, function () { data.accounts = []; draw(); })
+    ];
+    const stop = function () { stops.forEach(function (f) { if (typeof f === 'function') f(); }); };
     state.refreshGames = draw;
     tick = setInterval(function () { if (store.freeze) draw(); }, 60 * 1000);
     state.cleanup = function () { if (typeof stop === 'function') stop(); clearInterval(tick); state.refreshGames = null; };
@@ -5351,7 +5394,15 @@
     return {
       mine: true, canEdit: true, owner: user, currency: user.currency,
       list: BT.listTx, month: BT.monthTx, plan: BT.getPlan, shares: BT.planShares,
-      add: BT.addTx, update: BT.updateTx, remove: BT.deleteTx, restore: BT.restoreTx
+      add: BT.addTx, remove: BT.deleteTx, restore: BT.restoreTx,
+      update: function (id, changes) {
+        const before = BT.listTx().find(function (t) { return t.id === id; });
+        return BT.updateTx(id, changes).then(function (r) {
+          /* Alchemist badge: you fixed an entry's type. */
+          if (before && changes.type && changes.type !== before.type) trackBadge('alchemist');
+          return r;
+        });
+      }
     };
   }
 
@@ -5397,7 +5448,7 @@
     const filter = h('select', {
       id: 'f-filter',
       'aria-label': 'Show category',
-      onchange: function () { state.filter = filter.value; drawList(); }
+      onchange: function () { state.filter = filter.value; trackBadge('filter'); drawList(); }
     },
       h('option', { value: 'all' }, 'All categories'),
       Object.keys(BT.TYPE_LABELS).map(function (type) { return h('option', { value: type }, BT.TYPE_LABELS[type]); }));
@@ -5870,6 +5921,7 @@
       const stamp = 'passbookhub-transactions-' + (book.mine ? '' : user.username + '-') + BT.today();
       if (kind === 'csv') {
         const blob = new Blob(['\ufeff' + BT.toCsv(rows)], { type: 'text/csv;charset=utf-8' });
+        trackBadge('csv');
         const url = URL.createObjectURL(blob);
         const link = h('a', { href: url, download: stamp + '.csv' });
         document.body.appendChild(link);
@@ -5929,6 +5981,7 @@
 
     function exportCsv() {
       const blob = new Blob(['﻿' + BT.toCsv(book.list())], { type: 'text/csv;charset=utf-8' });
+      if (book.mine) trackBadge('csv');
       const url = URL.createObjectURL(blob);
       const link = h('a', { href: url, download: 'passbookhub-' + (book.mine ? '' : user.username + '-') + BT.today() + '.csv' });
       document.body.appendChild(link);
@@ -6894,15 +6947,16 @@
     const store = BADGES.load(user.id);
     /* The first check on a device only records what you already have, so old badges don't all pop up. */
     const first = store.fresh;
-    const results = BADGES.evaluate(badgeInput(null, store));
+    const results = BADGES.evaluate(badgeInput({}, store));
     const fresh = BADGES.commit(user.id, store, results);
     if (!first) celebrate(fresh);
-    publishGameStats(BADGES.evaluate(badgeInput(null, store)));
+    publishGameStats(BADGES.evaluate(badgeInput({}, store)));
   }
   BT.onTxChange(function () {
     if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
     checkBadges();
   });
+  document.addEventListener('pbh-chime', function () { trackBadge('chime'); });
   BT.onPlanChange(function () {
     if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
     checkBadges();

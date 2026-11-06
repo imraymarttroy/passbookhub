@@ -43,6 +43,7 @@ window.PBH_FX = (function () {
         osc.start(start);
         osc.stop(start + length + 0.05);
       });
+      document.dispatchEvent(new Event('pbh-chime'));
     } catch (e) { /* no sound, no problem */ }
   }
 

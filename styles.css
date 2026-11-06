@@ -4000,3 +4000,13 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 
 /* Confetti overlay */
 .fx-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9999; }
+
+/* 120 badges: tighter cards, "Show all" per group */
+.bd-list { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.625rem; }
+.bd-card { padding: 0.875rem; gap: 0.75rem; border-radius: 12px; }
+.bd-emoji { width: 2.25rem; height: 2.25rem; border-radius: 10px; font-size: 1.25rem; }
+.bd-body h3 { font-size: 0.875rem; }
+.bd-body > p.small { font-size: 0.78125rem; line-height: 1.45; }
+.bd-card.secret .bd-emoji { font-size: 1rem; font-weight: 600; color: var(--ink-2); filter: none; opacity: 1; }
+.bd-more { display: block; margin-top: 0.75rem; }
+.bd-ring { cursor: default; user-select: none; }
