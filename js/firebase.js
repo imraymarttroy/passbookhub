@@ -44,7 +44,7 @@ try {
   await import('./overview.js?v=10');
   await import('./whats-new.js?v=7');
   await import('./badges.js?v=2');
-  await import('./fx.js?v=1');
+  await import('./fx.js?v=2');
   await import('./app.js?v=73');
 } catch (error) {
   console.error(error);

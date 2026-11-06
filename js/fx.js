@@ -5,7 +5,12 @@ window.PBH_FX = (function () {
   'use strict';
 
   const SOUND_KEY = 'pbh.sound';
-  const COLORS = ['#b1e5f2', '#e8e9f3', '#fab219', '#0ca30c', '#ff6b68', '#a6a6a8'];
+  /* Plain white confetti. On the light theme white wouldn't show, so it uses the dark ink colour there. */
+  function confettiColor() {
+    const t = document.documentElement.dataset.theme;
+    const dark = t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    return dark ? '#ffffff' : '#272635';
+  }
   let audio = null;
 
   function soundOn() {
@@ -53,13 +58,14 @@ window.PBH_FX = (function () {
     canvas.width = w * dpr; canvas.height = hgt * dpr;
     ctx.scale(dpr, dpr);
     const pieces = [];
+    const color = confettiColor();
     for (let i = 0; i < 140; i++) {
       const fromLeft = i % 2 === 0;
       pieces.push({
         x: fromLeft ? -10 : w + 10, y: hgt * (0.55 + Math.random() * 0.25),
         vx: (fromLeft ? 1 : -1) * (4 + Math.random() * 7), vy: -(9 + Math.random() * 8),
         size: 5 + Math.random() * 5, rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
-        color: COLORS[i % COLORS.length], round: Math.random() < 0.3
+        color: color, round: Math.random() < 0.3
       });
     }
     const started = performance.now();
