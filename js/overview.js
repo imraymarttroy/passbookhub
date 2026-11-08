@@ -978,7 +978,7 @@ window.OVERVIEW = (function () {
     function goalForm(existing, isNew) {
       const g = existing || { name: '', kind: 'emergency', targetCents: 0, savedCents: 0, due: '' };
       const editing = existing && !isNew;
-      const kind = input('kind', 'Category', { tag: 'select', options: Object.keys(SOC.GOAL_KINDS).map(function (k) { return h('option', { value: k }, SOC.GOAL_KINDS[k]); }) });
+      const kind = input('kind', 'Goal type', { tag: 'select', options: Object.keys(SOC.GOAL_KINDS).map(function (k) { return h('option', { value: k }, SOC.GOAL_KINDS[k]); }) });
       kind.control.value = g.kind;
       const name = input('name', 'Goal name', { maxlength: 40, autocomplete: 'off', placeholder: 'e.g. Japan trip 2027' }, true);
       name.control.value = g.name;
@@ -986,17 +986,30 @@ window.OVERVIEW = (function () {
       const saved = input('savedCents', 'Saved so far (' + book.currency + ')', moneyAttrs, true);
       if (g.targetCents) target.control.value = BT.amountText(g.targetCents);
       if (editing || g.savedCents) saved.control.value = BT.amountText(g.savedCents) || '0.00';
-      const due = input('due', 'Target date (optional)', { type: 'date' });
+      const due = input('due', 'Target date (optional)', { type: 'date', min: editing && g.due && g.due < BT.today() ? g.due : BT.today() });
       due.control.value = g.due || '';
       const tip = h('p', { class: 'small muted ov-form-tip' });
+      /* Emergency fund: one tap fills the target with 3 or 6 months of your needs. */
+      const fill = h('div', { class: 'ov-chips ov-quick' });
+      target.wrap.insertBefore(fill, target.wrap.querySelector('.error'));
+      function monthlyNeeds() {
+        const c = compute();
+        if (c.avgNeeds > 0) return c.avgNeeds;
+        const p = book.plan && book.plan();
+        return p && p.salaryCents ? Math.round(p.salaryCents * ((p.shares && p.shares.needs) || 50) / 100) : 0;
+      }
       function drawTip() {
+        const needs = kind.control.value === 'emergency' ? monthlyNeeds() : 0;
         if (kind.control.value === 'emergency') {
-          const c = compute();
-          tip.textContent = c.avgNeeds > 0
-            ? 'Tip: 3 to 6 months of your needs is ' + money(c.avgNeeds * 3) + ' to ' + money(c.avgNeeds * 6) + '.'
-            : 'Tip: aim for 3 to 6 months of essential expenses.';
+          tip.textContent = needs > 0
+            ? 'Tip: 3 to 6 months of your needs is ' + money(needs * 3) + ' to ' + money(needs * 6) + '.'
+            : 'Tip: aim for 3 to 6 months of essential expenses. Log your needs or set your salary to see the amount.';
           tip.hidden = false;
         } else tip.hidden = true;
+        fill.replaceChildren.apply(fill, needs > 0 ? [3, 6].map(function (m) {
+          return h('button', { type: 'button', class: 'ov-chip', onclick: function () { target.control.value = BT.amountText(needs * m); } }, m + ' months · ' + money(needs * m));
+        }) : []);
+        fill.hidden = !needs;
         if (!name.control.value.trim() || Object.values(SOC.GOAL_KINDS).indexOf(name.control.value) !== -1) name.control.value = SOC.GOAL_KINDS[kind.control.value];
       }
       kind.control.addEventListener('change', drawTip);

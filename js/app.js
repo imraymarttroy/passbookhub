@@ -6130,8 +6130,7 @@
       if (!adding) sheetTitle.textContent = 'Income & spending';
       if (!sheet.open) { try { sheet.showModal(); } catch (e) { sheet.setAttribute('open', ''); } }
       setTimeout(function () {
-        const target = where === 'entries' ? listBox : form;
-        if (target && target.scrollIntoView) target.scrollIntoView({ block: 'start' });
+        if (where === 'entries' && listBox.scrollIntoView) listBox.scrollIntoView({ block: 'start' });
         if (where !== 'entries' && form.elements && form.elements.desc) form.elements.desc.focus({ preventScroll: true });
       }, 0);
     }

@@ -4191,3 +4191,22 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
   .zr-stat-v { font-size: 0.9375rem; }
   .zr-boxbar .zr-mini { width: 4.5rem; }
 }
+
+/* ======================================================================
+   Budget page tidy-up: nothing cut off, no half-empty rows
+   ====================================================================== */
+.bp-tile-meta { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+/* Donut legend: name and share on one line, the amount underneath, so names are never cut to "O…". */
+.bp-legend { gap: 0.625rem; }
+.bp-legend li { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "dot name pct" ". amt amt"; row-gap: 0.0625rem; column-gap: 0.5rem; }
+.bp-legend .mo-dot { grid-area: dot; }
+.bp-legend-name { grid-area: name; white-space: normal; overflow-wrap: anywhere; }
+.bp-legend-pct { grid-area: pct; }
+.bp-legend-amt { grid-area: amt; text-align: left; font-size: 0.75rem; }
+/* Category limits fill the card whether there is one row or ten. */
+.bp-lims { grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); }
+/* Filters: an even 2 × 2 grid instead of a ragged row. */
+.tl-pills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.tl-pill { width: 100% !important; }
+.tl-custom { grid-column: 1 / -1; }
+.acct-field .ov-quick { flex-wrap: wrap; margin: 0.5rem 0 0; overflow: visible; }
