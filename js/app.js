@@ -575,7 +575,12 @@
           signin ? signInForm() : signUpForm(mainBox),
           signin ? h('p', { class: 'auth-switch' }, ['Don\u2019t have an account? ', h('a', { href: '#signup' }, 'Sign up')]) : null,
           h('p', { class: 'or-divider' }, h('span', null, 'Or')),
-          socialButtons(view, redirectError)].filter(Boolean));
+          socialButtons(view, redirectError),
+          h('div', { class: 'auth-safety', role: 'note' },
+            h('span', { class: 'auth-safety-ic', 'aria-hidden': 'true' }, '🔐'),
+            h('p', null, h('strong', null, 'We will never ask for your password, OTP, CVV or MPIN. '),
+              'Not in messages, posts or emails. ',
+              h('a', { href: 'legal.html#charter', target: '_blank', rel: 'noopener' }, 'Read the Safety Charter')))].filter(Boolean));
     /* One centred column: logo, a single card with the form, and the footer. */
     return h('div', { class: 'auth-page auth-center' },
       h('div', { class: 'auth-panel' },
@@ -584,6 +589,7 @@
           h('span', null, '\u00a9 ' + new Date().getFullYear() + ' PassbookHub'),
           h('span', null, 'Half for needs, some for wants, the rest for later.'),
           h('a', { class: 'auth-legal', href: 'legal.html', target: '_blank', rel: 'noopener' }, 'Terms & Privacy'),
+          h('a', { class: 'auth-legal', href: 'legal.html#charter', target: '_blank', rel: 'noopener' }, 'Safety Charter'),
           languageButton(),
           themeTextButton())));
   }

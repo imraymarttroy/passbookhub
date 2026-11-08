@@ -58,7 +58,7 @@ button { font: inherit; color: inherit; }
 .back-link { font-size: 0.875rem; font-weight: 600; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
 .back-link:hover { color: var(--ink); }
 .progress { position: absolute; left: 0; bottom: -1px; height: 3px; width: 0; background: linear-gradient(90deg, var(--glow-a), var(--accent)); transition: width .1s linear; }
-@media (max-width: 40rem) { .back-link span, .logo b { display: none; } .tab { padding: 0.5rem 0.875rem; font-size: 0.875rem; } }
+@media (max-width: 40rem) { .back-link span, .logo b { display: none; } .tab { padding: 0.5rem 0.625rem; font-size: 0.8125rem; } }
 
 /* ---------- Hero ---------- */
 .hero { position: relative; overflow: hidden; }
@@ -290,6 +290,7 @@ mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
       <span class="tab-thumb" aria-hidden="true"></span>
       <button class="tab" role="tab" id="tab-terms" aria-controls="panel" data-doc="terms">Terms of Service</button>
       <button class="tab" role="tab" id="tab-privacy" aria-controls="panel" data-doc="privacy">Privacy Policy</button>
+      <button class="tab" role="tab" id="tab-charter" aria-controls="panel" data-doc="charter">Safety Charter</button>
     </div>
     <button class="icon-btn" id="theme" type="button" aria-label="Switch theme" title="Switch theme"></button>
     <a class="back-link" href="./#signup">← <span>Back to sign up</span></a>
@@ -432,11 +433,38 @@ mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
         { id: 'p-changes', t: 'Changes to this policy', p: 'If we change it, we’ll tell you.', h: '<p>If we make important changes, we’ll tell you in the app before they take effect. The date at the top always shows the current version.</p>' },
         { id: 'p-contact', t: 'Contact and data protection officer', p: 'Email us anytime.', h: '<p>For privacy questions or requests, contact our data protection officer at <a href="mailto:passbookhub@gmail.com">passbookhub@gmail.com</a>.</p>' }
       ]
+    },
+    charter: {
+      title: 'Security & Community Charter',
+      eyebrow: 'Safe money talk, for everyone',
+      lede: 'How PassbookHub protects your account and data, how you can protect yourself, and the rules everyone follows in Community. It applies to every member, moderator and admin.',
+      cards: [
+        { icon: 'lock', c: '#ffc8d8', t: 'We never ask for your OTP', b: 'Admins, moderators and real members will never ask for your password, bank OTP, CVV or e-wallet MPIN. Anyone who does is a scammer.' },
+        { icon: 'wallet', c: '#b1e5f2', t: 'No link to your bank', b: 'PassbookHub never connects to your online banking or asks for banking OTPs. Everything is logged by hand.' },
+        { icon: 'shield', c: '#c8f0cf', t: 'Your budget stays private', b: 'Only you (and the one trusted person you choose) can see your budget. Moderators can’t see it either.' },
+        { icon: 'user', c: '#cfc8ff', t: 'Blur before you share', b: 'Hide names, account and card numbers, QR codes, reference numbers and addresses in screenshots.' },
+        { icon: 'heart', c: '#ffd9c2', t: 'No shaming, no scams', b: 'Be kind about money. Scams, MLM, loan requests and referral spam aren’t allowed in Community.' },
+        { icon: 'ban', c: '#e2e3ee', t: 'Breaking the rules has a cost', b: 'From a friendly reminder, to a 7 to 30 day suspension, to a permanent ban for scams and doxxing.' }
+      ],
+      dd: {
+        yes: ['Turn on two-step verification (OTP) in Settings', 'Use a password you don’t use anywhere else', 'Report posts that ask for money, OTPs or personal details', 'Tag every Community post with the right flair', 'Do your own research before any investment'],
+        no: ['Share your password, OTP, CVV or MPIN with anyone', 'Post account, card or phone numbers, even partly', 'Click shortened links (bit.ly, tinyurl) or fake bank logins', 'Send money to people you met in posts or messages', 'Ask for loans, donations or e-wallet transfers']
+      },
+      sections: [
+        { id: 'c-scope', t: 'Scope and purpose', p: 'Keeping accounts, data and Community safe and scam-free.', h: '<p>This charter is PassbookHub’s security and community rulebook. It explains how we protect every member’s account and personal financial data, what members should do to stay safe, and the rules for Community. It works together with our <a href="#terms">Terms of Service</a> and <a href="#privacy">Privacy Policy</a>.</p>' },
+        { id: 'c-auth', t: 'Part I · Sign-up, sign-in and identity', p: '13+, verified email, a protected password, and two-step verification.', h: '<ul><li><strong>Age check:</strong> you must be 13 or older. We check your birthday when you sign up.</li><li><strong>Email verification:</strong> you must verify your email before you can set up your profile or post in Community.</li><li><strong>Passwords:</strong> sign-in is handled by Google Firebase Authentication. Passwords are never stored in plain text; they are kept as salted one-way hashes, and we can’t see them.</li><li><strong>Two-step verification:</strong> authenticator apps (Google Authenticator, Authy and others) are supported in Settings, and we strongly recommend them.</li><li><strong>Password recovery and lockout:</strong> reset links are single-use and expire. After too many failed sign-in attempts, sign-in is blocked for a while to stop guessing attacks.</li><li><strong>Sessions:</strong> you stay signed in with short-lived tokens that refresh automatically. Sign out on shared devices.</li></ul>' },
+        { id: 'c-data', t: 'Part I · Your financial data', p: 'No bank links, encrypted storage, and private by default.', h: '<ul><li><strong>Zero-link bank policy:</strong> PassbookHub never connects to your online banking and never asks for banking OTPs. Budgets, cutoffs, accounts and wallets are manual entries you type yourself.</li><li><strong>Encrypted at rest:</strong> all data is stored in Google Cloud Firestore, which encrypts it with AES-256.</li><li><strong>Encrypted in transit:</strong> everything travels over HTTPS (TLS, using TLS 1.3 when your browser supports it).</li><li><strong>Private by default:</strong> your budget, entries, goals, debts and wallets are visible only to you and the one trusted person you choose. On your public profile and to your circle, people see only your name, username, photo, bio and anything you choose to share.</li></ul>' },
+        { id: 'c-app', t: 'Part I · How the app defends itself', p: 'Strict database rules, bot protection and safe text and images.', h: '<ul><li><strong>Database security rules</strong> decide who can read and change every piece of data, so each person can only touch their own.</li><li><strong>Safe text:</strong> posts, comments and bios are always shown as plain text, never run as code, which blocks cross-site scripting.</li><li><strong>Bot protection:</strong> requests are checked with Firebase App Check (reCAPTCHA Enterprise), and Google’s infrastructure limits abusive traffic.</li><li><strong>Safe images:</strong> profile photos and attached pictures are redrawn as new image files in your browser before upload, which removes hidden details like GPS location.</li><li><strong>Limited moderator access:</strong> moderators can only see public Community posts and reports. They have no access to anyone’s budget or transactions.</li></ul>' },
+        { id: 'c-safety', t: 'Part II · Member safety rules', p: 'OTPs stay secret, blur screenshots, ignore DM “investments”.', h: '<ol><li><strong>The golden rule:</strong> PassbookHub admins, moderators and real members will never ask for your password, bank OTP, CVV or e-wallet MPIN. Anyone who asks, in a post or a message, is trying to scam you. Report them.</li><li><strong>Blur sensitive details:</strong> before sharing milestones, payslips or bank screenshots, hide your full name, account and card numbers, QR codes, reference numbers and home address.</li><li><strong>Ignore money pitches in messages:</strong> scammers use DMs for “secret investments”, crypto doubling and informal loans. Never send money to strangers outside real financial institutions.</li><li><strong>Watch out for links:</strong> don’t click shortened links (bit.ly, tinyurl) or sites that look like bank or e-wallet logins. Always check you’re on the real PassbookHub site.</li><li><strong>Unique password and 2FA:</strong> don’t reuse your bank or email password here, and turn on two-step verification.</li></ol>' },
+        { id: 'c-rules', t: 'Part III · Community rules', p: 'Seven rules for every post and comment.', h: '<ol><li><strong>Be respectful and constructive (no financial shaming).</strong> Everyone starts from a different place. Don’t insult or belittle anyone’s income or situation. Give advice that empowers.</li><li><strong>Protect anonymity and sensitive data (no doxxing).</strong> Don’t post full legal names, addresses, employer details or unredacted account numbers, yours or anyone else’s. Posts with account or card numbers are blocked automatically.</li><li><strong>Zero tolerance for scams.</strong> No get-rich-quick schemes, MLM or pyramid recruitment, task scams, crypto pump-and-dumps, illegal gambling or phishing links. This means a permanent ban.</li><li><strong>No loan requests or panhandling.</strong> Don’t ask for personal loans, cash, e-wallet transfers or crowdfunding, in posts or messages.</li><li><strong>No referral codes or spam.</strong> No referral codes, affiliate links, or course and insurance pitches without moderator approval.</li><li><strong>Not professional financial advice.</strong> What’s shared is personal experience for learning. Always do your own research and talk to licensed professionals.</li><li><strong>Use the right flair.</strong> Tag every post: Budget Tip, Payroll Check, 50/30/20 Split, Debt-Free Journey, Question/Advice or Security Alert.</li></ol>' },
+        { id: 'c-enforce', t: 'Part IV · How rules are enforced', p: 'Reminder, then suspension, then a permanent ban.', h: '<ul><li><strong>Automatic checks:</strong> posts and comments with account, card or phone numbers, shortened links, or requests for OTPs and passwords are refused before they’re saved.</li><li><strong>Level 1, minor or accidental</strong> (forgot to blur a detail, wrong flair, off-topic): the post is hidden after 3 member reports until a moderator reviews it, plus a friendly reminder to fix and repost.</li><li><strong>Level 2, moderate</strong> (shaming, toxic remarks, referral spam, repeated self-promotion): the post is removed and the member can be suspended from posting and commenting for 7 to 30 days.</li><li><strong>Level 3, severe</strong> (phishing, asking for OTPs or passwords, MLM or Ponzi recruitment, loan scams, doxxing): permanent ban from Community and removal of the posts.</li><li><strong>Compromised accounts:</strong> if your account acts strangely, reset your password, turn on two-step verification and email us. We can suspend it from Community until it’s secured.</li></ul><p>Report anything that breaks these rules with the ⚑ Report button on the post, or email <a href="mailto:passbookhub@gmail.com">passbookhub@gmail.com</a>.</p>' },
+        { id: 'c-contact', t: 'Report a security problem', p: 'Email us right away.', h: '<p>Found a scam, a security bug or a compromised account? Email <a href="mailto:passbookhub@gmail.com">passbookhub@gmail.com</a> with what happened. Never include your password or OTP in the email.</p>' }
+      ]
     }
   };
 
   /* ---------- State ---------- */
-  var doc = location.hash === '#privacy' ? 'privacy' : 'terms';
+  var doc = location.hash === '#privacy' ? 'privacy' : location.hash === '#charter' ? 'charter' : 'terms';
   var mode = 'quick';
   var main = document.getElementById('panel');
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
@@ -517,8 +545,8 @@ mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
         }).join('') + '<p class="empty" id="empty" hidden>No matches. Try another word.</p></div></div></div>';
     }
     html += '<div class="end" id="end"><div class="confetti" id="confetti"></div><svg class="ring" viewBox="0 0 80 80" aria-hidden="true"><circle class="track" cx="40" cy="40" r="32"/><circle class="val" id="ringval" cx="40" cy="40" r="32" stroke-dasharray="201" stroke-dashoffset="201"/><text x="40" y="46" text-anchor="middle" id="ringtxt">0%</text></svg>' +
-      '<h2 id="endtitle">Keep scrolling…</h2><p>' + (doc === 'terms' ? 'Thanks for reading the rules. Next, see how we protect your data.' : 'That’s everything about your data. Questions? We’re one email away.') + '</p>' +
-      '<button class="btn" type="button" id="next">' + (doc === 'terms' ? 'Next: Privacy Policy →' : 'Done, back to PassbookHub') + '</button></div>';
+      '<h2 id="endtitle">Keep scrolling…</h2><p>' + (doc === 'terms' ? 'Thanks for reading the rules. Next, see how we protect your data.' : doc === 'privacy' ? 'That’s everything about your data. Next, the safety charter.' : 'Thanks for helping keep PassbookHub safe for everyone.') + '</p>' +
+      '<button class="btn" type="button" id="next">' + (doc === 'terms' ? 'Next: Privacy Policy →' : doc === 'privacy' ? 'Next: Safety Charter →' : 'Done, back to PassbookHub') + '</button></div>';
     html += '<p class="note">This page is a plain-language summary of how PassbookHub works today. If anything here doesn’t match what you see in the app, email us and we’ll fix it.</p></div>';
     main.innerHTML = html;
     if (scrollTop) window.scrollTo({ top: 0 });
@@ -645,6 +673,7 @@ mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
     }
     document.getElementById('next').addEventListener('click', function () {
       if (doc === 'terms') { setDoc('privacy'); return; }
+      if (doc === 'privacy') { setDoc('charter'); return; }
       window.close();
       setTimeout(function () { location.href = './#signup'; }, 150);
     });
@@ -674,7 +703,7 @@ mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
   tabs.forEach(function (t) {
     t.addEventListener('click', function () { setDoc(t.dataset.doc); });
     t.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setDoc(doc === 'terms' ? 'privacy' : 'terms'); document.getElementById('tab-' + doc).focus(); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); var order = ['terms', 'privacy', 'charter']; var i = order.indexOf(doc) + (e.key === 'ArrowRight' ? 1 : -1); setDoc(order[(i + order.length) % order.length]); document.getElementById('tab-' + doc).focus(); }
     });
   });
   document.querySelectorAll('.mode button').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
@@ -684,10 +713,11 @@ mark { background: var(--surface-2); outline: 1px solid var(--line-strong); }
     var h = location.hash.slice(1);
     if (/^p-/.test(h)) { doc = 'privacy'; mode = 'full'; }
     if (/^t-/.test(h)) { doc = 'terms'; mode = 'full'; }
+    if (/^c-/.test(h)) { doc = 'charter'; mode = 'full'; }
   })();
   window.addEventListener('hashchange', function () {
     var h = location.hash.slice(1);
-    if (h === 'terms' || h === 'privacy') setDoc(h);
+    if (h === 'terms' || h === 'privacy' || h === 'charter') setDoc(h);
   });
 
   /* Progress, back to top, end-of-page celebration */

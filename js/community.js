@@ -263,7 +263,8 @@ window.COMM = (function () {
           h('h3', { class: 'cm-side-h' }, 'Community rules'),
           h('ol', { class: 'cm-rules' }, RULES.map(function (r, i) {
             return h('li', null, h('details', null, h('summary', null, h('span', { class: 'cm-rule-n num' }, String(i + 1)), r[0]), h('p', { class: 'small muted' }, r[1])));
-          }))));
+          })),
+          h('a', { class: 'cm-charter small', href: 'legal.html#charter', target: '_blank', rel: 'noopener' }, 'Read the full Security & Community Charter ↗')));
     }
     function setFlair(f) {
       flair = f;
@@ -438,7 +439,7 @@ window.COMM = (function () {
         h('label', { class: 'cm-label', for: 'cm-title' }, 'Title'), h('div', { class: 'cm-title-wrap' }, title, count),
         h('label', { class: 'cm-label', for: 'cm-body' }, 'Text'), body,
         warn,
-        h('label', { class: 'cm-agree small', for: 'cm-agree' }, agree, h('span', null, 'I’ve followed the ', h('strong', null, 'Community rules'), ': no shaming, no personal or account details, no scams, loan requests or referral codes. This is not financial advice.')),
+        h('label', { class: 'cm-agree small', for: 'cm-agree' }, agree, h('span', null, 'I’ve followed the ', h('a', { href: 'legal.html#charter', target: '_blank', rel: 'noopener' }, 'Community rules'), ': no shaming, no personal or account details, no scams, loan requests or referral codes. This is not financial advice.')),
         err,
         h('div', { class: 'cm-compose-acts' }, h('button', { type: 'button', class: 'btn', onclick: function () { close(); } }, 'Cancel'), post));
       const overlay = h('div', { class: 'chat-overlay ask cm-overlay' }, h('div', { class: 'ask-card cm-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'cm-compose-h' }, form));
