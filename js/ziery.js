@@ -61,6 +61,8 @@ window.ZIERY = (function () {
   ].map(function (r) {
     return { id: r[0], name: r[1], emoji: r[2], level: r[3], price: r[4], x: r[5], y: r[6], size: r[7], layer: r[8], replaces: r[9], note: r[10] };
   });
+  /** The picture for an item, including the ones drawn in CSS. */
+  function iconOf(i) { return i.emoji || ({ banig: '🟫', desk: '🪵', rug: '🟪', lights: '✨' })[i.id] || '✨'; }
   const BY_ID = {};
   ITEMS.forEach(function (i) { BY_ID[i.id] = i; });
 
@@ -199,7 +201,7 @@ window.ZIERY = (function () {
       return h('div', { class: 'zr-board', title: 'Wishlist' },
         h('span', { class: 'zr-board-h' }, 'Wishlist'),
         next.length ? next.map(function (i) {
-          return h('span', { class: 'zr-pin' + (s.coins >= i.price && s.level >= i.level ? ' ready' : '') }, i.emoji || '✦');
+          return h('span', { class: 'zr-pin' + (s.coins >= i.price && s.level >= i.level ? ' ready' : '') }, iconOf(i));
         }) : h('span', { class: 'zr-pin ready' }, '✓'));
     }
 
@@ -252,7 +254,7 @@ window.ZIERY = (function () {
           else if (locked) action = h('span', { class: 'zr-tag' }, 'Level ' + i.level);
           else action = h('button', { type: 'button', class: 'btn' + (enough ? ' primary' : ''), disabled: !enough || !!delivering, onclick: function () { buy(i); } }, enough ? 'Buy' : 'Save up');
           return h('li', { class: 'zr-row' + (locked ? ' locked' : '') + (own ? ' owned' : '') },
-            h('span', { class: 'zr-row-emoji', 'aria-hidden': 'true' }, i.emoji || (i.id === 'banig' ? '🟫' : i.id === 'desk' ? '🪵' : i.id === 'rug' ? '🟪' : '✨')),
+            h('span', { class: 'zr-row-emoji', 'aria-hidden': 'true' }, iconOf(i)),
             h('div', { class: 'zr-row-main' },
               h('div', { class: 'zr-row-top' }, h('span', { class: 'zr-row-name' }, i.name), i.price ? h('span', { class: 'zr-row-price num' }, '🪙 ' + fmt(i.price)) : null),
               h('p', { class: 'zr-row-note small muted' }, i.note + (i.replaces ? ' Replaces the ' + BY_ID[i.replaces].name.toLowerCase() + '.' : '')),
