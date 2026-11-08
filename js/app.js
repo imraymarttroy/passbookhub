@@ -272,13 +272,12 @@
     if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
     if (wanted === 'budget-plan') return 'budget-plan';
     if (wanted === 'games' || wanted === 'stash-streak') return 'stash-streak';
-    if (wanted === 'ziery') return 'ziery';
     /* After signing in (or with no page in the address), start on the profile. */
     return ['feed', 'profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'stash-streak', 'ziery', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -292,7 +291,6 @@
     feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
     'stash-streak': { title: 'Stash & Streak', render: viewGames },
-    ziery: { title: 'Ziery Simulator', render: viewZiery },
     profile: { title: 'Profile', render: viewTimeline },
     person: { title: 'Profile', render: viewPerson },
     shared: { title: 'Dashboard', render: viewShared },
@@ -2135,7 +2133,7 @@
   }
 
   /* Games: a channel like Dashboard, one sub-tab per game. Stash & Streak is the badges game. */
-  const GAME_CHANNEL = [['stash-streak', 'Stash & Streak'], ['ziery', 'Ziery Simulator']];
+  const GAME_CHANNEL = [['stash-streak', 'Stash & Streak']];
   function gamesChannel(current) {
     const here = GAME_CHANNEL.some(function (c) { return c[0] === current; });
     let open = here;
@@ -5419,40 +5417,12 @@
     tick = setInterval(function () { if (store.freeze) draw(); }, 60 * 1000);
     state.cleanup = function () { if (typeof stop === 'function') stop(); clearInterval(tick); state.refreshGames = null; };
     const page = h('div', { class: 'wide games' },
-      gamesSwitch('stash-streak'),
       h('p', { class: 'bd-kicker' }, 'Games'),
       h('h1', null, 'Stash & Streak'),
       h('p', { class: 'muted bd-lead' }, 'Earn badges for good money habits, keep your streak alive and race your circle. Your badges are saved on this device.'),
       summary, board, tabs, groupsEl);
     draw();
     return page;
-  }
-
-  /** On phones there is no sidebar, so each game page gets a small switch between the games. */
-  function gamesSwitch(current) {
-    return h('nav', { class: 'dash-switch', 'aria-label': 'Games' }, GAME_CHANNEL.map(function (c) {
-      return h('a', { class: 'dash-switch-btn', href: '#' + c[0], 'aria-current': c[0] === current ? 'page' : 'false' }, c[1]);
-    }));
-  }
-
-  /* ---------- Games › Ziery Simulator ---------- */
-  function viewZiery() {
-    const user = BT.currentUser();
-    const store = BADGES.load(user.id);
-    const data = { goals: null, debts: null, accounts: null };
-    trackBadge('view', 'games');
-    function badgeCount() {
-      try { return BADGES.evaluate(badgeInput(data, store)).filter(function (b) { return b.earned; }).length; } catch (e) { return 0; }
-    }
-    const game = ZIERY.render({ h: h, toast: toast, user: user, goals: function () { return data.goals || []; }, badges: badgeCount });
-    function refresh() { if (state.refreshZiery === refresh) game.refresh(); }
-    const stops = [
-      SOC.watchGoals(null, function (list) { data.goals = list; refresh(); }, function () { data.goals = []; refresh(); })
-    ];
-    state.refreshZiery = refresh;
-    state.cleanup = function () { stops.forEach(function (f) { if (typeof f === 'function') f(); }); if (game.stop) game.stop(); state.refreshZiery = null; };
-    game.el.insertBefore(gamesSwitch('ziery'), game.el.firstChild);
-    return game.el;
   }
 
   /* ---------- Dashboard ---------- */
@@ -7023,7 +6993,6 @@
     const user = BT.currentUser();
     if (!user || !user.profileDone || !window.BADGES) return;
     if (state.view === 'stash-streak' && state.refreshGames) { state.refreshGames(); return; }
-    if (state.view === 'ziery' && state.refreshZiery) state.refreshZiery();
     if (state.view === 'profile' && state.refreshProfileBadges) { state.refreshProfileBadges(); return; }
     const store = BADGES.load(user.id);
     /* The first check on a device only records what you already have, so old badges don't all pop up. */
