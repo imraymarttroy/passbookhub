@@ -379,6 +379,72 @@ service cloud.firestore {
       }
     }
 
+    // community/{postId}: Reddit-style posts everyone signed in can read, vote on and discuss.
+    // score is the sum of votes and always moves together with the voter's own votes/{uid} doc.
+    function communityFlairs() {
+      return ['ipon', 'budget', 'utang', 'invest', 'sweldo', 'tanong', 'kwento'];
+    }
+    function voteOf(postId, uid) {
+      return exists(/databases/$(database)/documents/community/$(postId)/votes/$(uid))
+        ? get(/databases/$(database)/documents/community/$(postId)/votes/$(uid)).data.v : 0;
+    }
+    function voteAfter(postId, uid) {
+      return existsAfter(/databases/$(database)/documents/community/$(postId)/votes/$(uid))
+        ? getAfter(/databases/$(database)/documents/community/$(postId)/votes/$(uid)).data.v : 0;
+    }
+    match /community/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && verified()
+        && request.resource.data.keys().hasOnly(['author', 'title', 'body', 'flair', 'createdAt', 'score', 'comments'])
+        && request.resource.data.author == request.auth.uid
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
+        && request.resource.data.body is string && request.resource.data.body.size() <= 3000
+        && request.resource.data.flair in communityFlairs()
+        && request.resource.data.createdAt is int
+        && request.resource.data.score == 0 && request.resource.data.comments == 0;
+      // The author can edit the text.
+      allow update: if signedIn() && request.auth.uid == resource.data.author
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'editedAt'])
+        && request.resource.data.body is string && request.resource.data.body.size() <= 3000
+        && request.resource.data.editedAt is int;
+      // Anyone can move the score, but only by exactly the change in their own vote.
+      allow update: if signedIn() && verified()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['score'])
+        && request.resource.data.score - resource.data.score == voteAfter(postId, request.auth.uid) - voteOf(postId, request.auth.uid);
+      // The comment counter moves by one when a comment is added or removed.
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
+        && (request.resource.data.comments == resource.data.comments + 1 || request.resource.data.comments == resource.data.comments - 1)
+        && request.resource.data.comments >= 0;
+      allow delete: if signedIn() && request.auth.uid == resource.data.author;
+
+      match /votes/{voter} {
+        allow read: if signedIn();
+        allow create, update: if signedInAs(voter) && verified()
+          && request.resource.data.keys().hasOnly(['v'])
+          && (request.resource.data.v == 1 || request.resource.data.v == -1)
+          && getAfter(/databases/$(database)/documents/community/$(postId)).data.score
+             == get(/databases/$(database)/documents/community/$(postId)).data.score + request.resource.data.v - (resource == null ? 0 : resource.data.v);
+        allow delete: if signedInAs(voter)
+          && (!existsAfter(/databases/$(database)/documents/community/$(postId))
+            || getAfter(/databases/$(database)/documents/community/$(postId)).data.score
+               == get(/databases/$(database)/documents/community/$(postId)).data.score - resource.data.v);
+      }
+
+      // comments/{commentId}: parent is '' for a top-level comment, or the comment it replies to.
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if signedIn() && verified()
+          && request.resource.data.keys().hasOnly(['author', 'text', 'parent', 'createdAt'])
+          && request.resource.data.author == request.auth.uid
+          && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1500
+          && request.resource.data.parent is string && request.resource.data.parent.size() <= 40
+          && request.resource.data.createdAt is int;
+        allow delete: if signedIn() && (request.auth.uid == resource.data.author
+          || request.auth.uid == get(/databases/$(database)/documents/community/$(postId)).data.author);
+      }
+    }
+
     // "For you" feed: a collection-group query over everyone's public posts.
     match /{path=**}/posts/{postId} {
       allow read: if request.auth != null && resource.data.visibility == 'public';

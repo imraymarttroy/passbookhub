@@ -267,6 +267,7 @@
     if (/^chat\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'messages';
     if (/^d\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'shared';
     if (wanted === 'messages') return 'messages';
+    if (wanted === 'community' || /^community\/[A-Za-z0-9]{6,40}$/.test(wanted)) return 'community';
     if (wanted === 'notifications') return 'alerts';
     if (wanted === 'dashboard') return 'dashboard';
     if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
@@ -277,7 +278,7 @@
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'community', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -290,6 +291,7 @@
     'budget-plan': { title: 'Budget & Transactions', render: viewDashboard },
     feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
+    community: { title: 'Community', render: viewCommunity },
     'stash-streak': { title: 'Stash & Streak', render: viewGames },
     profile: { title: 'Profile', render: viewTimeline },
     person: { title: 'Profile', render: viewPerson },
@@ -1699,6 +1701,7 @@
     circle: '<circle cx="7" cy="7.5" r="2.75"/><circle cx="13.5" cy="8" r="2.25"/><path d="M2.5 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12 12.2c2.3-.4 4.5.9 5.2 3.8"/>',
     messages: '<path d="M3.5 5.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-3.5 3v-3a2 2 0 0 1-2-2z"/>',
     feed: '<rect x="3" y="3" width="14" height="14" rx="2.5"/><path d="M6.5 7h7M6.5 10h7M6.5 13h4"/>',
+    community: '<circle cx="7.5" cy="7" r="2.5"/><circle cx="13.5" cy="8" r="2"/><path d="M3 16c.6-2.6 2.4-4 4.5-4s3.9 1.4 4.5 4M12.5 12.2c1.9-.2 3.6.9 4.2 3.3"/>',
     games: '<path d="M6.5 6.5h7a4 4 0 0 1 4 4v1a3 3 0 0 1-5.3 1.9l-.7-.9h-3l-.7.9A3 3 0 0 1 2.5 11.5v-1a4 4 0 0 1 4-4z"/><path d="M6.5 9v2.5M5.25 10.25h2.5M13 9.5h.01M14.5 11h.01"/>',
     notifications: '<path d="M5 13.5V9a5 5 0 0 1 10 0v4.5l1.5 1.5h-13z"/><path d="M8.5 17.5a1.6 1.6 0 0 0 3 0"/>',
     settings: '<path d="M8.7 2.5h2.6l.45 2.05a5.6 5.6 0 0 1 1.5.87l2-.66 1.3 2.25-1.56 1.4a5.7 5.7 0 0 1 0 1.73l1.56 1.4-1.3 2.25-2-.66a5.6 5.6 0 0 1-1.5.87l-.45 2.05H8.7l-.45-2.05a5.6 5.6 0 0 1-1.5-.87l-2 .66-1.3-2.25 1.56-1.4a5.7 5.7 0 0 1 0-1.73l-1.56-1.4 1.3-2.25 2 .66a5.6 5.6 0 0 1 1.5-.87z"/><circle cx="10" cy="10" r="2.4"/>',
@@ -2308,7 +2311,7 @@
         h('ul', { class: 'nav-list' },
           dashboardChannel(current),
           item('feed', '#feed', 'Feed'),
-          lockedItem('Community'),
+          item('community', '#community', 'Community'),
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
           gamesChannel(current),
@@ -5423,6 +5426,11 @@
       summary, board, tabs, groupsEl);
     draw();
     return page;
+  }
+
+  /* ---------- Community (Reddit-style) ---------- */
+  function viewCommunity() {
+    return COMM.render({ h: h, toast: toast, ask: ask, icon: icon, avatar: avatar, timeAgo: timeAgo, user: BT.currentUser() });
   }
 
   /* ---------- Dashboard ---------- */
