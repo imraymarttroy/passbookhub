@@ -267,6 +267,7 @@
     if (/^chat\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'messages';
     if (/^d\/[A-Za-z0-9_]{3,20}$/.test(wanted)) return 'shared';
     if (wanted === 'messages') return 'messages';
+    if (wanted === 'feed') return 'community'; /* the Feed was removed: everyone posts in Community now */
     if (wanted === 'community' || /^community\/[A-Za-z0-9]{6,40}$/.test(wanted)) return 'community';
     if (wanted === 'notifications') return 'alerts';
     if (wanted === 'dashboard') return 'dashboard';
@@ -274,11 +275,11 @@
     if (wanted === 'budget-plan') return 'budget-plan';
     if (wanted === 'games' || wanted === 'stash-streak') return 'stash-streak';
     /* After signing in (or with no page in the address), start on the profile. */
-    return ['feed', 'profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
+    return ['profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'community', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'community', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -289,7 +290,6 @@
     secure: { title: 'Secure your account', render: viewSecure },
     dashboard: { title: 'Dashboard', render: viewDashboard },
     'budget-plan': { title: 'Budget & Transactions', render: viewDashboard },
-    feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
     community: { title: 'Community', render: viewCommunity },
     'stash-streak': { title: 'Stash & Streak', render: viewGames },
@@ -325,7 +325,7 @@
     document.body.classList.toggle('auth-body', view === 'signin' || view === 'signup');
     if (SHELL_VIEWS.indexOf(view) !== -1 && BT.currentUser()) {
       trackBadge('open');
-      if (['dashboard', 'budget-plan', 'feed', 'messages', 'profile'].indexOf(view) !== -1) trackBadge('view', view);
+      if (['dashboard', 'budget-plan', 'community', 'messages', 'profile'].indexOf(view) !== -1) trackBadge('view', view);
       if (currentTheme() === 'dark') trackBadge('dark');
     }
     const content = VIEWS[view].render(view);
@@ -2316,7 +2316,6 @@
       h('nav', { 'aria-label': 'Main' },
         h('ul', { class: 'nav-list' },
           dashboardChannel(current),
-          item('feed', '#feed', 'Feed'),
           item('community', '#community', 'Community'),
           item('messages', '#messages', 'Messages', messagesBadge()),
           lockedItem('Blog'),
@@ -3045,116 +3044,6 @@
     return article;
   }
 
-  /** "What's new?" box at the top of the feed. */
-  function threadComposer(user, onPosted) {
-    const text = h('textarea', { id: 'f-post', name: 'post', rows: 1, maxlength: SOC.POST_MAX, placeholder: 'What’s new?', 'aria-label': 'Start a post' });
-    const counter = h('span', { class: 'th-counter num', 'aria-live': 'polite' });
-    const select = visibilityIcons(state.postVisibility || 'public', function (v) { state.postVisibility = v; });
-    const send = postButton();
-    send.disabled = true;
-    function sync() {
-      text.style.height = 'auto';
-      text.style.height = Math.min(text.scrollHeight, 320) + 'px';
-      const left = SOC.POST_MAX - text.value.length;
-      counter.textContent = left <= 60 ? String(left) : '';
-      send.disabled = !text.value.trim();
-      form.classList.toggle('active', !!text.value || document.activeElement === text);
-    }
-    text.addEventListener('input', sync);
-    text.addEventListener('focus', sync);
-    text.addEventListener('blur', function () { setTimeout(sync, 150); });
-    const form = h('form', {
-      class: 'th-composer', novalidate: true,
-      onsubmit: function (event) {
-        event.preventDefault();
-        const problem = SOC.validatePost(text.value, select.value);
-        if (problem) return showErrors(form, { _form: problem });
-        busy(form, 'Posting…', async function () {
-          await SOC.createPost(text.value, select.value);
-          text.value = '';
-          toast('Posted.');
-          onPosted();
-        }).then(sync);
-      }
-    },
-      h('a', { class: 'th-rail-pic', href: '#profile', 'aria-label': 'Your profile' }, avatar(user, user.avatar, 2.25)),
-      h('div', { class: 'th-compose-main' },
-        h('strong', { class: 'th-name' }, user.name),
-        text,
-        formError(),
-        h('div', { class: 'th-compose-bar' }, select, counter, send)));
-    enterToSubmit(text, form);
-    setTimeout(sync, 0);
-    return form;
-  }
-
-  function viewFeed() {
-    const user = BT.currentUser();
-    const list = h('div', { class: 'th-list', 'aria-live': 'polite' });
-    const note = h('p', { class: 'th-note small muted', hidden: true });
-    let tab = state.feedTab === 'following' ? 'following' : 'foryou';
-    let ticket = 0;
-
-    function mineFix(item) {
-      return item.mine ? Object.assign({}, item, { person: Object.assign({}, item.person, { id: user.id, name: user.name, username: user.username, avatar: user.avatar }) }) : item;
-    }
-
-    async function load() {
-      const mine = ++ticket;
-      note.hidden = true;
-      if (!list.children.length) list.replaceChildren(h('p', { class: 'th-empty small muted' }, 'Loading…'));
-      let items;
-      try {
-        const following = SOC.feedPosts(60);
-        if (tab === 'following') items = await following;
-        else {
-          const r = await Promise.all([SOC.publicPosts(40).catch(function (e) { console.warn(e); return null; }), following.catch(function () { return []; })]);
-          if (r[0] === null) { note.textContent = 'Showing posts from you and your circle. Public posts from everyone will appear here soon.'; note.hidden = false; }
-          const seen = {};
-          items = [].concat(r[0] || [], r[1]).filter(function (it) {
-            const key = it.person.id + '/' + it.post.id;
-            if (seen[key]) return false;
-            seen[key] = true;
-            return true;
-          }).sort(function (a, b) { return b.post.createdAt - a.post.createdAt; }).slice(0, 60);
-        }
-      } catch (error) {
-        if (mine === ticket) list.replaceChildren(h('p', { class: 'th-empty' }, error.message || 'We could not load your feed.'));
-        return;
-      }
-      if (mine !== ticket || (!list.isConnected && list.parentNode)) return;
-      if (!items.length) {
-        list.replaceChildren(h('div', { class: 'th-empty' },
-          h('strong', null, tab === 'following' ? 'Nothing here yet' : 'Be the first to post'),
-          h('p', { class: 'small muted' }, 'Share something, or add people to ', h('a', { href: '#circle' }, 'your circle'), ' to see their posts.')));
-        return;
-      }
-      list.replaceChildren.apply(list, items.map(function (item) { return threadPost(mineFix(item), load); }));
-    }
-
-    const tabs = [['foryou', 'For you'], ['following', 'Following']].map(function (t) {
-      return h('button', {
-        type: 'button', role: 'tab', class: 'th-tab', 'aria-selected': tab === t[0] ? 'true' : 'false',
-        onclick: function () {
-          if (tab === t[0]) { window.scrollTo({ top: 0 }); load(); return; }
-          tab = state.feedTab = t[0];
-          tabs.forEach(function (b, i) { b.setAttribute('aria-selected', ['foryou', 'following'][i] === tab ? 'true' : 'false'); });
-          list.replaceChildren();
-          load();
-        }
-      }, t[1]);
-    });
-
-    load();
-    return h('div', { class: 'wide th-page' },
-      h('h1', { class: 'vh' }, 'Feed'),
-      h('div', { class: 'th-tabs', role: 'tablist', 'aria-label': 'Feed' }, tabs),
-      h('div', { class: 'th-column' },
-        threadComposer(user, load),
-        note,
-        list));
-  }
-
   /* ---------- Profile (dashboard style) ---------- */
 
   const PROFILE_ICONS = {
@@ -3740,7 +3629,7 @@
           onEdit: function () { editProfile(redrawAll); },
           actions: [
             h('button', { type: 'button', class: 'btn pf-btn', onclick: function () { editProfile(redrawAll); } }, icon('edit'), h('span', null, 'Edit profile')),
-            h('a', { class: 'btn pf-btn ghost', href: '#feed' }, navIcon('feed'), h('span', null, 'Go to Feed'))
+            h('a', { class: 'btn pf-btn ghost', href: '#community' }, navIcon('community'), h('span', null, 'Go to Community'))
           ]
         }));
     }

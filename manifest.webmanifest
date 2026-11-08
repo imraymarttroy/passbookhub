@@ -15,7 +15,7 @@
   ],
   "shortcuts": [
     { "name": "Overview", "url": "./#dashboard", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Feed", "url": "./#feed", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Community", "url": "./#community", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Messages", "url": "./#messages", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }

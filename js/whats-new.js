@@ -311,7 +311,7 @@ window.WHATS_NEW = (function () {
     { icon: 'budget', title: 'budgetTitle', body: 'budgetBody', demo: demoBudget, soon: true },
     { icon: 'track', title: 'trackTitle', body: 'trackBody', demo: demoTrack, soon: true },
     { icon: 'goal', title: 'goalTitle', body: 'goalBody', demo: demoGoal, soon: true },
-    { icon: 'ai', title: 'aiTitle', body: 'aiBody', demo: demoAI, go: '#feed' },
+    { icon: 'ai', title: 'aiTitle', body: 'aiBody', demo: demoAI, go: '#community' },
     { icon: 'lock', title: 'secTitle', body: 'secBody', demo: demoSecurity, go: '#settings' },
     { icon: 'spark', title: 'soonTitle', body: 'soonBody', demo: demoSoon }
   ];

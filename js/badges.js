@@ -86,9 +86,9 @@ window.BADGES = (function () {
       Object.keys(days).forEach(function (k) { if (days[k].ok) good[k] = 1; });
       return count(runOf(good, c.today).best, 7);
     }),
-    b('navigation-pro', 'habit', '🧭', 'Navigation Pro', 'Visit Overview, Budget, Feed, Messages, Games and Profile within 5 minutes.', function (c) {
+    b('navigation-pro', 'habit', '🧭', 'Navigation Pro', 'Visit Overview, Budget, Community, Messages, Games and Profile within 5 minutes.', function (c) {
       const v = c.ev.views || {};
-      const pages = ['dashboard', 'budget-plan', 'feed', 'messages', 'games', 'profile'];
+      const pages = ['dashboard', 'budget-plan', 'community', 'messages', 'games', 'profile'];
       const stamps = [];
       pages.forEach(function (p) { (v[p] || []).forEach(function (t) { stamps.push({ p: p, t: t }); }); });
       stamps.sort(function (a, b2) { return a.t - b2.t; });
