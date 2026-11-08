@@ -15,13 +15,17 @@ window.WHATS_NEW = (function () {
    * Bump it with every release and update CHANGES below. A new version shows the tour once more,
    * even for people who ticked "Don't show this again".
    */
-  const APP_VERSION = '2.5.0';
+  const APP_VERSION = '2.6.0';
   /* The full tour on login only comes back when this changes; small updates use the minimal popup instead. */
   const FEATURES_VERSION = '2.0.0';
 
   /* What changed in APP_VERSION, shown in the minimal update popup (version button in the sidebar). */
   const UPDATE = {
     en: { title: 'What\u2019s new', close: 'Close', ok: 'Got it', items: [
+      ['Ziery Simulator', 'A new game in Games: good money habits earn Cash Coins and Savings XP. Buy Ziery\u2019s wishlist items and watch the room grow from a banig to a dream setup.'],
+      ['Money format', 'Every amount now shows commas and 2 decimals, like \u20b110,000.00, including the amount boxes as you type.'],
+      ['Quicker adding', '+ Add expense / income and + Add entry now open a short form, not the whole list.'],
+      ['On your phone', 'Tap your picture to view your profile or set your status. Conversations fill the screen.'],
       ['Games: 120 badges', 'Collect badges for logging streaks, staying on budget and saving. Streak counter on your Overview, confetti for every win, and a circle leaderboard.'],
       ['Budget & Transactions', 'One page for your split, salary auto-split, categories with icons and limits, spending charts, limits vs actuals, recent activity, bills, goals and every transaction.'],
       ['Alert pop-ups', 'New alerts now pop up at the bottom right.'],
@@ -31,6 +35,10 @@ window.WHATS_NEW = (function () {
       ['Coming soon', 'Community and Blog are in the sidebar, locked for now.']
     ] },
     fil: { title: 'Ano ang bago', close: 'Isara', ok: 'Sige', items: [
+      ['Ziery Simulator', 'Bagong laro sa Games: kumikita ng Cash Coins at Savings XP sa magandang money habits. Bilhin ang wishlist ni Ziery at panoorin ang kwarto mula banig hanggang dream setup.'],
+      ['Format ng pera', 'May comma at 2 decimal na ang lahat ng halaga, gaya ng \u20b110,000.00, pati habang nagta-type.'],
+      ['Mas mabilis mag-add', 'Maikling form na lang ang lalabas sa + Add expense / income at + Add entry.'],
+      ['Sa phone', 'I-tap ang picture mo para makita ang profile o mag-set ng status. Buong screen na ang chat.'],
       ['Games: 120 badges', 'Mangolekta ng badges sa tuloy-tuloy na pag-log, pagsunod sa budget at pag-iipon. May streak counter sa Overview, confetti sa bawat panalo at leaderboard ng circle mo.'],
       ['Budget & Transactions', 'Iisang page na para sa hatian mo, auto-split ng sweldo, mga category na may icon at limit, charts ng gastos, limits vs actual, recent, bayarin, goals at lahat ng transaction.'],
       ['Alert pop-ups', 'Lumalabas na sa kanang ibaba ang mga bagong alert.'],
@@ -53,12 +61,12 @@ window.WHATS_NEW = (function () {
       budgetTitle: 'Your money, split smart', budgetBody: 'Drag to set your monthly income. PassbookHub splits it 50/30/20 for you.',
       income: 'Monthly income', needs: 'Needs', wants: 'Wants', savings: 'Savings',
       trackTitle: 'Every peso, tracked', trackBody: 'Log a spend and watch your category limit. We warn you before you go over.',
-      groceries: 'Groceries', addSpend: '+ ₱500 expense', reset: 'Start over', left: 'left', almost: 'Almost at limit', over: 'Over by', limit: 'Limit',
+      groceries: 'Groceries', addSpend: '+ ₱500.00 expense', reset: 'Start over', left: 'left', almost: 'Almost at limit', over: 'Over by', limit: 'Limit',
       goalTitle: 'Goals you can feel', goalBody: 'Set a target and watch it fill. Tap to save and reach your emergency fund.',
-      goalName: 'Emergency fund', save: '+ ₱3,000 saved', goalMet: 'Goal met!', of2: 'of',
+      goalName: 'Emergency fund', save: '+ ₱3,000.00 saved', goalMet: 'Goal met!', of2: 'of',
       dueTomorrow: 'Due tomorrow', paid: 'Paid', rent: 'Rent split with Ate', kuya: 'Kuya owes you',
       aiTitle: 'Your circle and an AI coach', aiBody: 'Share wins with family and friends, and ask PassbookHub AI anything about money.',
-      q: 'How do I start an emergency fund?', a: 'Start small: save 3 to 6 months of needs. Even ₱500 a payday adds up. Want me to set a goal?', replay: 'Replay',
+      q: 'How do I start an emergency fund?', a: 'Start small: save 3 to 6 months of needs. Even ₱500.00 a payday adds up. Want me to set a goal?', replay: 'Replay',
       secTitle: 'Safe, and always yours', secBody: 'Two-step verification protects your account. Your monthly statement saves as a PDF.',
       verified: 'Verified', statement: 'November statement'
     },
@@ -73,12 +81,12 @@ window.WHATS_NEW = (function () {
       budgetTitle: 'Matalinong hatian ng pera', budgetBody: 'I-drag para itakda ang buwanang kita. Hahatiin ito ng PassbookHub sa 50/30/20.',
       income: 'Buwanang kita', needs: 'Needs', wants: 'Wants', savings: 'Ipon',
       trackTitle: 'Bawat piso, bantay', trackBody: 'Magtala ng gastos at bantayan ang limit. Babalaan ka namin bago ka lumampas.',
-      groceries: 'Grocery', addSpend: '+ ₱500 na gastos', reset: 'Ulitin', left: 'natitira', almost: 'Malapit na sa limit', over: 'Lumampas ng', limit: 'Limit',
+      groceries: 'Grocery', addSpend: '+ ₱500.00 na gastos', reset: 'Ulitin', left: 'natitira', almost: 'Malapit na sa limit', over: 'Lumampas ng', limit: 'Limit',
       goalTitle: 'Mga goal na ramdam mo', goalBody: 'Magtakda ng target at panoorin itong mapuno. I-tap para mag-ipon.',
-      goalName: 'Emergency fund', save: '+ ₱3,000 na ipon', goalMet: 'Naabot mo na!', of2: 'sa',
+      goalName: 'Emergency fund', save: '+ ₱3,000.00 na ipon', goalMet: 'Naabot mo na!', of2: 'sa',
       dueTomorrow: 'Due bukas', paid: 'Bayad na', rent: 'Hati sa upa kay Ate', kuya: 'Utang ni Kuya sa iyo',
       aiTitle: 'Ang circle mo at isang AI coach', aiBody: 'Ibahagi ang tagumpay sa pamilya at kaibigan, at magtanong sa PassbookHub AI tungkol sa pera.',
-      q: 'Paano magsimula ng emergency fund?', a: 'Magsimula nang maliit: mag-ipon ng 3 hanggang 6 na buwan ng needs. Kahit ₱500 kada sweldo, malaki na. Gusto mong gumawa tayo ng goal?', replay: 'Ulitin',
+      q: 'Paano magsimula ng emergency fund?', a: 'Magsimula nang maliit: mag-ipon ng 3 hanggang 6 na buwan ng needs. Kahit ₱500.00 kada sweldo, malaki na. Gusto mong gumawa tayo ng goal?', replay: 'Ulitin',
       secTitle: 'Ligtas, at sa iyo lang', secBody: 'Pinoprotektahan ng two-step verification ang account mo. Puwedeng i-save bilang PDF ang buwanang statement.',
       verified: 'Verified', statement: 'Statement ng Nobyembre'
     }
@@ -92,7 +100,7 @@ window.WHATS_NEW = (function () {
   }
   function get(store, key) { try { return window[store].getItem(key); } catch (e) { return null; } }
   function set(store, key, val) { try { window[store].setItem(key, val); } catch (e) { /* storage may be off */ } }
-  function peso(n) { return '₱' + Math.round(n).toLocaleString('en-PH'); }
+  function peso(n) { return '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
   const reduced = function () { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
 
   function el(tag, attrs) {

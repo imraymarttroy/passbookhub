@@ -977,8 +977,59 @@ window.BT = (function () {
     return { state: 'normal', ratio: ratio, kind: 'left', amount: target - spent };
   }
 
+  /* Every amount reads the same everywhere: symbol, commas every 3 digits and 2 decimals (₱10,000.00). */
+  const moneyFormats = {};
   function formatMoney(cents, currency) {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency }).format(cents / 100);
+    const code = currency || 'PHP';
+    let f = moneyFormats[code];
+    if (!f) {
+      try { f = new Intl.NumberFormat('en-PH', { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol', minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      catch (e) { f = new Intl.NumberFormat('en-PH', { style: 'currency', currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      moneyFormats[code] = f;
+    }
+    return f.format((Number(cents) || 0) / 100);
+  }
+  const amountFormat = new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  /** "10,000.00" for an amount box. Empty for nothing. */
+  function amountText(cents) { return cents ? amountFormat.format(cents / 100) : ''; }
+  /** Reads "10,000.50", "₱ 10000.5" or "10000" from an amount box. NaN when it is not a number. */
+  function parseAmount(raw) {
+    const clean = String(raw == null ? '' : raw).replace(/[^0-9.\-]/g, '');
+    if (clean === '' || clean === '.' || clean === '-') return NaN;
+    return parseFloat(clean);
+  }
+  /** Turns an <input> into a money box: commas while typing, 2 decimals when you leave it. */
+  function moneyInput(input) {
+    if (!input || input.dataset.money) return input;
+    input.dataset.money = '1';
+    input.type = 'text';
+    input.inputMode = 'decimal';
+    input.autocomplete = 'off';
+    input.classList.add('money-in');
+    input.removeAttribute('step'); input.removeAttribute('min');
+    if (!input.placeholder) input.placeholder = '0.00';
+    input.addEventListener('input', function () {
+      const before = input.value;
+      const caretFromEnd = before.length - (input.selectionEnd == null ? before.length : input.selectionEnd);
+      let v = before.replace(/[^0-9.]/g, '');
+      const dot = v.indexOf('.');
+      if (dot !== -1) v = v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+      let whole = dot === -1 ? v : v.slice(0, dot);
+      const frac = dot === -1 ? '' : v.slice(dot);
+      whole = whole.replace(/^0+(?=\d)/, '');
+      whole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      const next = whole + frac;
+      if (next !== before) {
+        input.value = next;
+        const pos = Math.max(0, next.length - caretFromEnd);
+        try { input.setSelectionRange(pos, pos); } catch (e) { /* not focusable */ }
+      }
+    });
+    input.addEventListener('blur', function () {
+      const n = parseAmount(input.value);
+      if (isFinite(n)) input.value = amountFormat.format(n);
+    });
+    return input;
   }
 
   /** Whole-account CSV. Cells that a spreadsheet would run as a formula are neutralised. */
@@ -1011,7 +1062,7 @@ window.BT = (function () {
     validateSocialProfile: validateSocialProfile, completeSocialProfile: completeSocialProfile,
     sendVerification: sendVerification, refreshVerified: refreshVerified, sendPasswordReset: sendPasswordReset, lastEmailSent: lastEmailSent,
     onTxChange: onTxChange, listTx: listTx, addTx: addTx, updateTx: updateTx, deleteTx: deleteTx, restoreTx: restoreTx, monthTx: monthTx,
-    summarize: summarize, bucketStatus: bucketStatus, formatMoney: formatMoney, toCsv: toCsv,
+    summarize: summarize, bucketStatus: bucketStatus, formatMoney: formatMoney, amountText: amountText, parseAmount: parseAmount, moneyInput: moneyInput, toCsv: toCsv,
     DEFAULT_SHARES: DEFAULT_SHARES, PLAN_MAX_CATS: PLAN_MAX_CATS, getPlan: getPlan, planShares: planShares, planIsLocal: planIsLocal,
     onPlanChange: onPlanChange, savePlan: savePlan, readPlan: readPlan, splitAmount: splitAmount
   };

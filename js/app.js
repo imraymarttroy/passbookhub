@@ -272,12 +272,13 @@
     if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
     if (wanted === 'budget-plan') return 'budget-plan';
     if (wanted === 'games' || wanted === 'stash-streak') return 'stash-streak';
+    if (wanted === 'ziery') return 'ziery';
     /* After signing in (or with no page in the address), start on the profile. */
     return ['feed', 'profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'feed', 'messages', 'stash-streak', 'ziery', 'profile', 'person', 'circle', 'alerts', 'settings'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -291,6 +292,7 @@
     feed: { title: 'Feed', render: viewFeed },
     messages: { title: 'Messages', render: viewMessages },
     'stash-streak': { title: 'Stash & Streak', render: viewGames },
+    ziery: { title: 'Ziery Simulator', render: viewZiery },
     profile: { title: 'Profile', render: viewTimeline },
     person: { title: 'Profile', render: viewPerson },
     shared: { title: 'Dashboard', render: viewShared },
@@ -2060,7 +2062,15 @@
     }
     function open() {
       const choice = SOC.myStatusChoice();
-      menu = h('div', { class: 'status-menu', role: 'menu', 'aria-label': 'Your status' },
+      /* On phones the name is hidden, so the picture's menu also leads to your profile. */
+      const mobile = window.matchMedia('(max-width: 760px)').matches;
+      const profileRow = mobile ? h('div', { class: 'status-profile' },
+        h('div', { class: 'status-profile-who' }, avatarWithStatus(user, 2.5),
+          h('span', { class: 'status-profile-names' }, h('strong', null, user.name), h('span', { class: 'small muted' }, '@' + user.username))),
+        h('a', { class: 'btn status-profile-btn', href: '#profile', role: 'menuitem', onclick: function () { close(false); } }, 'View profile')) : null;
+      menu = h('div', { class: 'status-menu' + (mobile ? ' is-mobile' : ''), role: 'menu', 'aria-label': mobile ? 'You' : 'Your status' },
+        profileRow,
+        mobile ? h('p', { class: 'status-menu-label' }, 'Set status') : null,
         OPTIONS.map(function (o) {
           return h('button', {
             type: 'button', class: 'status-item', role: 'menuitemradio', 'aria-checked': choice === o[0] ? 'true' : 'false',
@@ -2079,7 +2089,7 @@
       document.addEventListener('keydown', onKey);
       window.addEventListener('resize', reposition);
       window.addEventListener('hashchange', closeNow);
-      (menu.querySelector('[aria-checked="true"]') || menu.querySelector('.status-item')).focus();
+      (mobile ? menu.querySelector('.status-profile-btn') : (menu.querySelector('[aria-checked="true"]') || menu.querySelector('.status-item'))).focus();
     }
     btn.addEventListener('click', function () { if (menu) close(false); else open(); });
     wrap.appendChild(h('div', { class: 'sidebar-me' + (here ? ' here' : '') }, btn, nameLink));
@@ -2125,7 +2135,7 @@
   }
 
   /* Games: a channel like Dashboard, one sub-tab per game. Stash & Streak is the badges game. */
-  const GAME_CHANNEL = [['stash-streak', 'Stash & Streak']];
+  const GAME_CHANNEL = [['stash-streak', 'Stash & Streak'], ['ziery', 'Ziery Simulator']];
   function gamesChannel(current) {
     const here = GAME_CHANNEL.some(function (c) { return c[0] === current; });
     let open = here;
@@ -5293,7 +5303,7 @@
         share].filter(Boolean));
     }
 
-    function money(units) { return BT.formatMoney(units * 100, user.currency).replace(/\.00$/, ''); }
+    function money(units) { return BT.formatMoney(units * 100, user.currency); }
 
     function claimButton(b) {
       if (b.claim === 'self') {
@@ -5409,12 +5419,40 @@
     tick = setInterval(function () { if (store.freeze) draw(); }, 60 * 1000);
     state.cleanup = function () { if (typeof stop === 'function') stop(); clearInterval(tick); state.refreshGames = null; };
     const page = h('div', { class: 'wide games' },
+      gamesSwitch('stash-streak'),
       h('p', { class: 'bd-kicker' }, 'Games'),
       h('h1', null, 'Stash & Streak'),
       h('p', { class: 'muted bd-lead' }, 'Earn badges for good money habits, keep your streak alive and race your circle. Your badges are saved on this device.'),
       summary, board, tabs, groupsEl);
     draw();
     return page;
+  }
+
+  /** On phones there is no sidebar, so each game page gets a small switch between the games. */
+  function gamesSwitch(current) {
+    return h('nav', { class: 'dash-switch', 'aria-label': 'Games' }, GAME_CHANNEL.map(function (c) {
+      return h('a', { class: 'dash-switch-btn', href: '#' + c[0], 'aria-current': c[0] === current ? 'page' : 'false' }, c[1]);
+    }));
+  }
+
+  /* ---------- Games › Ziery Simulator ---------- */
+  function viewZiery() {
+    const user = BT.currentUser();
+    const store = BADGES.load(user.id);
+    const data = { goals: null, debts: null, accounts: null };
+    trackBadge('view', 'games');
+    function badgeCount() {
+      try { return BADGES.evaluate(badgeInput(data, store)).filter(function (b) { return b.earned; }).length; } catch (e) { return 0; }
+    }
+    const game = ZIERY.render({ h: h, toast: toast, user: user, goals: function () { return data.goals || []; }, badges: badgeCount });
+    function refresh() { if (state.refreshZiery === refresh) game.refresh(); }
+    const stops = [
+      SOC.watchGoals(null, function (list) { data.goals = list; refresh(); }, function () { data.goals = []; refresh(); })
+    ];
+    state.refreshZiery = refresh;
+    state.cleanup = function () { stops.forEach(function (f) { if (typeof f === 'function') f(); }); state.refreshZiery = null; };
+    game.el.insertBefore(gamesSwitch('ziery'), game.el.firstChild);
+    return game.el;
   }
 
   /* ---------- Dashboard ---------- */
@@ -5492,6 +5530,7 @@
     const submitButton = h('button', { class: 'btn primary', type: 'submit' }, 'Add entry');
     const cancelButton = h('button', { type: 'button', class: 'btn', hidden: true, onclick: stopEditing }, 'Cancel');
     const formTitle = h('h2', null, 'Add an entry');
+    const sheetTitle = h('h2', { class: 'sheet-title', id: 'sheet-title' }, 'Add expense or income');
     const catList = h('datalist', { id: 'tx-cat-list' });
     const methodSelect = h('select', { id: 'f-method', name: 'method' },
       h('option', { value: '' }, 'Not set'),
@@ -5522,7 +5561,7 @@
       h('div', null, segments, hint),
       h('div', { class: 'tx-fields' },
         field({ name: 'desc', label: 'Description', wrapClass: 'span-all', attrs: { maxlength: 80, autocomplete: 'off' } }),
-        field({ name: 'amount', label: 'Amount (' + book.currency + ')', type: 'number', attrs: { inputmode: 'decimal', step: '0.01', min: '0' } }),
+        field({ name: 'amount', label: 'Amount (' + book.currency + ')', control: BT.moneyInput(h('input', { id: 'f-amount', name: 'amount', 'aria-describedby': null })) }),
         field({ name: 'date', label: 'Date', type: 'date' }),
         field({ name: 'category', label: 'Category (optional)', attrs: { maxlength: 40, autocomplete: 'off', list: 'tx-cat-list', placeholder: 'e.g. Groceries' } }),
         field({ name: 'method', label: 'Payment method (optional)', control: methodSelect })),
@@ -5556,7 +5595,7 @@
       const desc = form.elements.desc.value.trim();
       const raw = form.elements.amount.value;
       const date = form.elements.date.value;
-      const cents = Math.round(parseFloat(raw) * 100);
+      const cents = Math.round(BT.parseAmount(raw) * 100);
       const errors = {};
       if (!desc) errors.desc = 'Enter a description.';
       if (!raw || !isFinite(cents) || cents <= 0) errors.amount = 'Enter an amount above zero.';
@@ -5599,12 +5638,15 @@
         submitButton.disabled = false;
       }
       resetForm(BT.monthOf(date));
+      /* Opened just to add one entry: close once it is saved. */
+      if (sheet.open && sheet.dataset.mode === 'add') { sheet.close(); return; }
       form.elements.desc.focus();
     }
 
     function resetForm(month) {
       state.editingId = null;
       formTitle.textContent = 'Add an entry';
+      sheetTitle.textContent = 'Add expense or income';
       submitButton.textContent = 'Add entry';
       cancelButton.hidden = true;
       form.elements.desc.value = '';
@@ -5628,11 +5670,12 @@
       state.editingId = tx.id;
       state.txType = tx.type;
       formTitle.textContent = 'Edit entry';
+      sheetTitle.textContent = 'Edit entry';
       submitButton.textContent = 'Save changes';
       cancelButton.hidden = false;
       form.elements.type.value = tx.type;
       form.elements.desc.value = tx.desc;
-      form.elements.amount.value = (tx.cents / 100).toFixed(2);
+      form.elements.amount.value = BT.amountText(tx.cents);
       form.elements.date.value = tx.date;
       form.elements.category.value = tx.category || '';
       form.elements.method.value = BT.PAYMENT_METHODS.indexOf(tx.method) !== -1 ? tx.method : (tx.method ? 'Other' : '');
@@ -5885,10 +5928,12 @@
 
         hero.replaceChildren(
           h('div', { class: 'mo-card-head' }, h('h3', { id: 'tl-net-h', class: 'mo-label' }, 'Net cashflow'),
-            book.canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { stopEditingQuiet(); openSheet('form'); } }, '+ Add') : null),
-          h('p', { class: 'mo-big num' }, (net < 0 ? '−' : '') + money(Math.abs(net))),
-          h('p', { class: 'mo-note num' }, money(inC) + ' in · ' + money(outC) + ' out'),
-          h('div', { class: 'mo-actions' },
+            book.canEdit ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { stopEditingQuiet(); openSheet('form'); } }, '+ Add entry') : null),
+          h('p', { class: 'mo-big num tl-net' + (net < 0 ? ' is-neg' : '') }, (net < 0 ? '−' : net > 0 ? '+' : '') + money(Math.abs(net))),
+          h('dl', { class: 'tl-io' },
+            h('div', null, h('dt', null, 'Money in'), h('dd', { class: 'num' }, '+' + money(inC))),
+            h('div', null, h('dt', null, 'Money out'), h('dd', { class: 'num' }, '−' + money(outC)))),
+          h('div', { class: 'mo-actions tl-export' },
             h('span', { class: 'mo-faint small' }, 'Export what you see'),
             h('span', { class: 'tl-exports' },
               h('button', { type: 'button', class: 'mo-link', onclick: function () { exportRows(filtered(), 'csv'); } }, 'CSV'),
@@ -6074,11 +6119,15 @@
     const trackerPanel = h('div', { id: 'panel-tracker', role: 'tabpanel' }, tracker.el);
     /* The 50/30/20 form and the entries list live in a sheet that opens over the Overview. */
     const sheetClose = h('button', { type: 'button', class: 'icon-btn entries-sheet-x', 'aria-label': 'Close', title: 'Close', onclick: function () { sheet.close(); } }, icon('close'));
-    const sheet = h('dialog', { class: 'entries-sheet', 'aria-label': 'Entries' }, sheetClose, budgetPanel);
+    const sheet = h('dialog', { class: 'entries-sheet', 'aria-labelledby': 'sheet-title' }, h('div', { class: 'sheet-head' }, sheetTitle, sheetClose), budgetPanel);
     sheet.addEventListener('click', function (e) { if (e.target === sheet) sheet.close(); });
-    sheet.addEventListener('close', refreshOv);
+    sheet.addEventListener('close', function () { if (state.editingId) resetForm(); refreshOv(); });
     form.addEventListener('submit', function () { setTimeout(refreshOv, 300); });
     function openSheet(where) {
+      const adding = where !== 'entries';
+      sheet.dataset.mode = adding ? 'add' : 'entries';
+      if (adding && !state.editingId) sheetTitle.textContent = 'Add expense or income';
+      if (!adding) sheetTitle.textContent = 'Income & spending';
       if (!sheet.open) { try { sheet.showModal(); } catch (e) { sheet.setAttribute('open', ''); } }
       setTimeout(function () {
         const target = where === 'entries' ? listBox : form;
@@ -6130,17 +6179,17 @@
     budgetPanel.setAttribute('role', 'tabpanel');
     budgetPanel.setAttribute('aria-labelledby', 'tab-budget');
     budgetPanel.append(
-      h('div', { class: 'budget-head' }, h('h2', null, 'Income & spending'),
+      h('div', { class: 'budget-head sheet-only-entries' }, h('h2', null, 'Income & spending'),
         h('p', { class: 'small muted' }, 'Add an entry and see how this month stands against your split. Change the split on the Budget & Transactions page.')),
-      h('section', { 'aria-label': 'Monthly summary' },
+      h('section', { class: 'sheet-only-entries', 'aria-label': 'Monthly summary' },
         h('div', { class: 'month-nav' },
           monthHeading,
           thisMonth,
           h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Previous month', title: 'Previous month', onclick: function () { setMonth(BT.addMonths(state.month, -1)); } }, icon('prev')),
           h('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Next month', title: 'Next month', onclick: function () { setMonth(BT.addMonths(state.month, 1)); } }, icon('next'))),
         summary),
-      book.canEdit ? h('section', { class: 'section' }, formTitle, h('div', { style: 'margin-top:0.75rem' }, form)) : null,
-      h('section', { class: 'section' },
+      book.canEdit ? h('section', { class: 'section sheet-form' }, formTitle, h('div', { class: 'sheet-form-body' }, form)) : null,
+      h('section', { class: 'section sheet-only-entries' },
         h('div', { class: 'list-head' },
           h('h2', null, 'Entries'),
           h('div', { class: 'row' },
@@ -6212,7 +6261,7 @@
     function monthIncome() {
       return book.month(thisMonth()).reduce(function (t, x) { return t + (x.type === 'income' ? x.cents : 0); }, 0);
     }
-    function toCents(raw) { const c = Math.round(parseFloat(raw) * 100); return isFinite(c) && c > 0 ? Math.min(c, 100000000000000) : 0; }
+    function toCents(raw) { const c = Math.round(BT.parseAmount(raw) * 100); return isFinite(c) && c > 0 ? Math.min(c, 100000000000000) : 0; }
 
     async function save(next, done) {
       try {
@@ -6293,17 +6342,18 @@
 
     /* ---- Salary auto-split ---- */
     const salaryIn = h('input', {
-      type: 'number', class: 'bp-salary-in num', min: '0', step: '0.01', inputmode: 'decimal', placeholder: '0.00', 'aria-label': 'Monthly salary (' + book.currency + ')',
+      class: 'bp-salary-in num', placeholder: '0.00', 'aria-label': 'Monthly salary (' + book.currency + ')',
       disabled: !canEdit,
       oninput: function () { calcCents = toCents(salaryIn.value); drawCalcBody(); }
     });
+    BT.moneyInput(salaryIn);
     const calcBody = h('div', { class: 'bp-calc-body' });
     const saveSalary = h('button', { type: 'button', class: 'mo-btn', onclick: function () {
       const next = plan(); next.salaryCents = calcCents || 0;
       save(next, next.salaryCents ? 'Salary saved' : 'Salary cleared').then(function (ok) { if (ok) { calcCents = null; drawAll(); } });
     } }, 'Save');
     function drawCalc() {
-      if (calcCents === null) { const p = plan().salaryCents; salaryIn.value = p ? (p / 100).toFixed(2) : ''; }
+      if (calcCents === null) { const p = plan().salaryCents; salaryIn.value = p ? BT.amountText(p) : ''; }
       drawCalcBody();
     }
     function drawCalcBody() {
@@ -6333,7 +6383,7 @@
       oninput: function () { if (!pickedIcon) drawIcons(); } });
     const sugg = h('datalist', { id: 'bp-cat-sugg' });
     const typeSeg = h('div', { class: 'bp-seg', role: 'radiogroup', 'aria-label': 'Budget group' });
-    const capIn = h('input', { type: 'number', class: 'bp-text num', min: '0', step: '0.01', inputmode: 'decimal', placeholder: 'No limit', 'aria-label': 'Monthly limit (' + book.currency + ')' });
+    const capIn = BT.moneyInput(h('input', { class: 'bp-text num', placeholder: 'No limit', 'aria-label': 'Monthly limit (' + book.currency + ')' }));
     const iconGrid = h('div', { class: 'bp-icons', role: 'radiogroup', 'aria-label': 'Icon' });
     const formErr = h('p', { class: 'bp-err', role: 'alert', hidden: true });
     const formTitle = h('h3', { class: 'mo-label' });
@@ -6381,7 +6431,7 @@
       delBtn.hidden = !cat;
       nameIn.value = cat ? cat.name : (preset && preset.name) || '';
       pickedType = cat ? cat.type : (preset && preset.type) || 'wants';
-      capIn.value = cat && cat.cents ? (cat.cents / 100).toFixed(2) : '';
+      capIn.value = cat && cat.cents ? BT.amountText(cat.cents) : '';
       pickedIcon = cat ? cat.icon : '';
       formErr.hidden = true;
       catForm.hidden = false;
@@ -6395,7 +6445,7 @@
     async function saveCat() {
       const name = nameIn.value.trim().slice(0, 40);
       const rawCap = capIn.value.trim();
-      const cents = rawCap ? Math.round(parseFloat(rawCap) * 100) : 0;
+      const cents = rawCap ? Math.round(BT.parseAmount(rawCap) * 100) : 0;
       if (!name) return fail('Enter a name for the category.');
       if (rawCap && (!isFinite(cents) || cents < 0)) return fail('Enter a limit of zero or more, or leave it empty.');
       if (cents > 100000000000000) return fail('That limit is too large.');
@@ -6579,14 +6629,14 @@
         Object.keys(SOC.ACCOUNT_TYPES).map(function (k) { return h('option', { value: k }, SOC.ACCOUNT_TYPES[k]); }));
       typeSelect.value = existing ? existing.type : (presetType || 'savings');
       const nameIn = h('input', { id: 'f-acct-name', name: 'acct-name', maxlength: 40, autocomplete: 'off', placeholder: 'e.g. Emergency Fund' });
-      const amountIn = h('input', { id: 'f-acct-amount', name: 'acct-amount', type: 'number', inputmode: 'decimal', step: '0.01', min: '0' });
+      const amountIn = BT.moneyInput(h('input', { id: 'f-acct-amount', name: 'acct-amount' }));
       const last4In = h('input', { id: 'f-acct-last4', name: 'acct-last4', inputmode: 'numeric', maxlength: 4, autocomplete: 'off', placeholder: 'Optional' });
-      if (existing) { nameIn.value = existing.name; amountIn.value = (existing.cents / 100).toFixed(2); last4In.value = existing.last4 || ''; }
+      if (existing) { nameIn.value = existing.name; amountIn.value = BT.amountText(existing.cents); last4In.value = existing.last4 || ''; }
       const amountLabel = h('label', { for: 'f-acct-amount' });
       function refresh() {
         const owedType = typeSelect.value === 'credit' || typeSelect.value === 'loan';
         amountLabel.textContent = (owedType ? 'Amount owed' : 'Balance') + ' (' + book.currency + ')';
-        const cents = Math.round(parseFloat(amountIn.value || '0') * 100) || 0;
+        const cents = Math.round(BT.parseAmount(amountIn.value || '0') * 100) || 0;
         const temp = { bank: bankId || 'other', name: nameIn.value.trim() || 'Account name', type: typeSelect.value, cents: Math.max(0, cents), last4: /^[0-9]{4}$/.test(last4In.value) ? last4In.value : '' };
         const wasHidden = hidden; hidden = false;
         preview.replaceChildren(card(temp));
@@ -6615,7 +6665,7 @@
         onsubmit: async function (event) {
           event.preventDefault();
           const raw = amountIn.value.trim();
-          const cents = raw === '' ? 0 : Math.round(parseFloat(raw) * 100);
+          const cents = raw === '' ? 0 : Math.round(BT.parseAmount(raw) * 100);
           const data = { bank: bankId, name: nameIn.value, type: typeSelect.value, cents: isFinite(cents) ? cents : -1, last4: last4In.value.trim() };
           const problems = SOC.validateAccount(data);
           form.querySelectorAll('.error').forEach(function (e) { e.hidden = true; });
@@ -6974,6 +7024,7 @@
     const user = BT.currentUser();
     if (!user || !user.profileDone || !window.BADGES) return;
     if (state.view === 'stash-streak' && state.refreshGames) { state.refreshGames(); return; }
+    if (state.view === 'ziery' && state.refreshZiery) state.refreshZiery();
     if (state.view === 'profile' && state.refreshProfileBadges) { state.refreshProfileBadges(); return; }
     const store = BADGES.load(user.id);
     /* The first check on a device only records what you already have, so old badges don't all pop up. */

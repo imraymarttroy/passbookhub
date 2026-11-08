@@ -338,7 +338,7 @@ window.BADGES = (function () {
   }
 
   function money(units, currency) {
-    try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency, maximumFractionDigits: 0 }).format(units); }
+    try { return BT.formatMoney(Math.round(units * 100), currency); }
     catch (e) { return units + ' ' + currency; }
   }
 

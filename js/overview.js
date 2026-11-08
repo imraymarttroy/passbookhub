@@ -72,7 +72,7 @@ window.OVERVIEW = (function () {
     const h = ctx.h, icon = ctx.icon, book = ctx.book;
     const owner = book.mine ? null : book.owner.id;
     const money = function (cents) { return BT.formatMoney(cents, book.currency); };
-    const compact = new Intl.NumberFormat(I18N.locale, { style: 'currency', currency: book.currency, notation: 'compact', maximumFractionDigits: 1 });
+    const compact = { format: function (units) { return BT.formatMoney(Math.round(units * 100), book.currency); } };
     const show = function (cents) { return hiddenAmounts() ? '••••••' : money(cents); };
     const data = { accounts: null, debts: null, goals: null, debtError: null, goalError: null };
     let range = 6;
@@ -611,16 +611,18 @@ window.OVERVIEW = (function () {
     }
 
     function input(id, label, attrs, grow) {
-      const control = h(attrs && attrs.tag === 'select' ? 'select' : 'input', Object.assign({ id: 'f-ov-' + id, name: id }, attrs && attrs.tag ? {} : attrs), attrs && attrs.options ? attrs.options : null);
+      const plain = Object.assign({}, attrs || {}); delete plain.money;
+      const control = h(attrs && attrs.tag === 'select' ? 'select' : 'input', Object.assign({ id: 'f-ov-' + id, name: id }, attrs && attrs.tag ? {} : plain), attrs && attrs.options ? attrs.options : null);
+      if (attrs && attrs.money) BT.moneyInput(control);
       return { control: control, wrap: h('div', { class: 'acct-field' + (grow ? ' grow' : '') }, h('label', { for: 'f-ov-' + id }, label), control, h('p', { class: 'error small', id: 'e-ov-' + id, hidden: true })) };
     }
     function cents(control) {
       const raw = control.value.trim();
       if (raw === '') return 0;
-      const v = Math.round(parseFloat(raw) * 100);
+      const v = Math.round(BT.parseAmount(raw) * 100);
       return isFinite(v) ? v : -1;
     }
-    const moneyAttrs = { type: 'number', inputmode: 'decimal', step: '0.01', min: '0' };
+    const moneyAttrs = { money: true, placeholder: '0.00' };
 
     function debtForm(existing, presetDir) {
       const d = existing || { dir: presetDir || 'owe', person: '', note: '', cents: 0, paidCents: 0, due: '' };
@@ -782,13 +784,13 @@ window.OVERVIEW = (function () {
       /* ---- Amounts ---- */
       const total = input('cents', 'Amount (' + book.currency + ')', Object.assign({ placeholder: '0.00' }, moneyAttrs), true);
       const paid = input('paidCents', 'Paid so far (' + book.currency + ')', Object.assign({ placeholder: '0.00' }, moneyAttrs), true);
-      if (existing) { total.control.value = (d.cents / 100).toFixed(2); paid.control.value = d.paidCents ? (d.paidCents / 100).toFixed(2) : ''; }
-      const toField = function (c) { return c % 100 ? (c / 100).toFixed(2) : String(c / 100); };
+      if (existing) { total.control.value = BT.amountText(d.cents); paid.control.value = BT.amountText(d.paidCents); }
+      const toField = function (c) { return BT.amountText(c) || '0.00'; };
       const quick = h('div', { class: 'ov-chips ov-quick' }, [10000, 50000, 100000, 500000].map(function (c) {
         return h('button', { type: 'button', class: 'ov-chip', title: 'Add to amount', onclick: function () {
           total.control.value = toField(Math.max(0, cents(total.control)) + c);
           clearError('cents'); drawSummary(); bump(pvAmount);
-        } }, '+' + (c / 100).toLocaleString());
+        } }, '+' + BT.formatMoney(c, book.currency));
       }));
       total.wrap.insertBefore(quick, total.wrap.querySelector('.error'));
 
@@ -982,8 +984,8 @@ window.OVERVIEW = (function () {
       name.control.value = g.name;
       const target = input('targetCents', 'Target (' + book.currency + ')', moneyAttrs, true);
       const saved = input('savedCents', 'Saved so far (' + book.currency + ')', moneyAttrs, true);
-      if (g.targetCents) target.control.value = (g.targetCents / 100).toFixed(2);
-      if (editing || g.savedCents) saved.control.value = (g.savedCents / 100).toFixed(2);
+      if (g.targetCents) target.control.value = BT.amountText(g.targetCents);
+      if (editing || g.savedCents) saved.control.value = BT.amountText(g.savedCents) || '0.00';
       const due = input('due', 'Target date (optional)', { type: 'date' });
       due.control.value = g.due || '';
       const tip = h('p', { class: 'small muted ov-form-tip' });
