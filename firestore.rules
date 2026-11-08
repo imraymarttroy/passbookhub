@@ -379,10 +379,28 @@ service cloud.firestore {
       }
     }
 
-    // community/{postId}: Reddit-style posts everyone signed in can read, vote on and discuss.
-    // score is the sum of votes and always moves together with the voter's own votes/{uid} doc.
+    // ---------- Community (PassbookHub Security & Community Charter v3) ----------
+    // community/{postId}: Reddit-style posts. score always moves together with the voter's votes/{uid} doc.
+    // Rule 7 flairs. Rule 2: posts with account or card numbers are refused. Part II-4: no shortened links.
     function communityFlairs() {
-      return ['ipon', 'budget', 'utang', 'invest', 'sweldo', 'tanong', 'kwento'];
+      return ['budget-tip', 'payroll-check', 'split', 'debt-free', 'question', 'security-alert'];
+    }
+    // Moderators are added by hand in the console: moderators/{uid}. They only see public posts and reports.
+    function isMod() {
+      return signedIn() && exists(/databases/$(database)/documents/moderators/$(request.auth.uid));
+    }
+    // A suspension (Level 2) has an end time; a permanent ban (Level 3) has until = 0.
+    function notBanned() {
+      return !exists(/databases/$(database)/documents/communityBans/$(request.auth.uid))
+        || (get(/databases/$(database)/documents/communityBans/$(request.auth.uid)).data.until > 0
+            && get(/databases/$(database)/documents/communityBans/$(request.auth.uid)).data.until < request.time.toMillis());
+    }
+    // 10+ digits in a row (single spaces or dashes allowed) look like an account, card or phone number.
+    // Shortened links hide where they go. Asking for OTPs, PINs or passwords is a scam sign.
+    function safeText(t) {
+      return !t.matches('(?s).*[0-9]([ -]?[0-9]){9,}.*')
+        && !t.lower().matches('(?s).*(bit[.]ly|tinyurl|t[.]co/|goo[.]gl|cutt[.]ly|is[.]gd|shorturl).*')
+        && !t.lower().matches('(?s).*(send|give|share|pm|dm|ibigay|ipadala|pasend)[^.?!]{0,30}(otp|mpin|cvv|password|pin code).*');
     }
     function voteOf(postId, uid) {
       return exists(/databases/$(database)/documents/community/$(postId)/votes/$(uid))
@@ -392,20 +410,39 @@ service cloud.firestore {
       return existsAfter(/databases/$(database)/documents/community/$(postId)/votes/$(uid))
         ? getAfter(/databases/$(database)/documents/community/$(postId)/votes/$(uid)).data.v : 0;
     }
+
+    match /moderators/{uid} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+    match /communityBans/{uid} {
+      allow read: if signedInAs(uid) || isMod();
+      allow create, update: if isMod() && request.auth.uid != uid
+        && request.resource.data.keys().hasOnly(['level', 'reason', 'until', 'by', 'at'])
+        && request.resource.data.level in [2, 3]
+        && request.resource.data.reason is string && request.resource.data.reason.size() <= 200
+        && request.resource.data.until is int
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.at is int;
+      allow delete: if isMod();
+    }
+
     match /community/{postId} {
       allow read: if signedIn();
-      allow create: if signedIn() && verified()
-        && request.resource.data.keys().hasOnly(['author', 'title', 'body', 'flair', 'createdAt', 'score', 'comments'])
+      allow create: if signedIn() && verified() && notBanned()
+        && request.resource.data.keys().hasOnly(['author', 'title', 'body', 'flair', 'createdAt', 'score', 'comments', 'reports'])
         && request.resource.data.author == request.auth.uid
         && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 120
         && request.resource.data.body is string && request.resource.data.body.size() <= 3000
+        && safeText(request.resource.data.title) && safeText(request.resource.data.body)
         && request.resource.data.flair in communityFlairs()
         && request.resource.data.createdAt is int
-        && request.resource.data.score == 0 && request.resource.data.comments == 0;
+        && request.resource.data.score == 0 && request.resource.data.comments == 0 && request.resource.data.reports == 0;
       // The author can edit the text.
-      allow update: if signedIn() && request.auth.uid == resource.data.author
+      allow update: if signedIn() && request.auth.uid == resource.data.author && notBanned()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['body', 'editedAt'])
         && request.resource.data.body is string && request.resource.data.body.size() <= 3000
+        && safeText(request.resource.data.body)
         && request.resource.data.editedAt is int;
       // Anyone can move the score, but only by exactly the change in their own vote.
       allow update: if signedIn() && verified()
@@ -416,7 +453,17 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['comments'])
         && (request.resource.data.comments == resource.data.comments + 1 || request.resource.data.comments == resource.data.comments - 1)
         && request.resource.data.comments >= 0;
-      allow delete: if signedIn() && request.auth.uid == resource.data.author;
+      // A report adds one, together with the reporter's own reports/{uid} doc (one report per person).
+      allow update: if signedIn() && verified()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reports'])
+        && request.resource.data.reports == resource.data.get('reports', 0) + 1
+        && !exists(/databases/$(database)/documents/community/$(postId)/reports/$(request.auth.uid))
+        && existsAfter(/databases/$(database)/documents/community/$(postId)/reports/$(request.auth.uid));
+      // Moderators can clear reports after review.
+      allow update: if isMod()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reports'])
+        && request.resource.data.reports == 0;
+      allow delete: if signedIn() && (request.auth.uid == resource.data.author || isMod());
 
       match /votes/{voter} {
         allow read: if signedIn();
@@ -431,16 +478,27 @@ service cloud.firestore {
                == get(/databases/$(database)/documents/community/$(postId)).data.score - resource.data.v);
       }
 
+      // reports/{reporter}: only moderators can read them (Part I-3: no access to anything private).
+      match /reports/{reporter} {
+        allow read: if isMod() || signedInAs(reporter);
+        allow create: if signedInAs(reporter) && verified()
+          && request.resource.data.keys().hasOnly(['reason', 'at'])
+          && request.resource.data.reason in ['shaming', 'pii', 'scam', 'loan', 'spam', 'advice', 'flair', 'other']
+          && request.resource.data.at is int;
+        allow delete: if isMod();
+      }
+
       // comments/{commentId}: parent is '' for a top-level comment, or the comment it replies to.
       match /comments/{commentId} {
         allow read: if signedIn();
-        allow create: if signedIn() && verified()
+        allow create: if signedIn() && verified() && notBanned()
           && request.resource.data.keys().hasOnly(['author', 'text', 'parent', 'createdAt'])
           && request.resource.data.author == request.auth.uid
           && request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1500
+          && safeText(request.resource.data.text)
           && request.resource.data.parent is string && request.resource.data.parent.size() <= 40
           && request.resource.data.createdAt is int;
-        allow delete: if signedIn() && (request.auth.uid == resource.data.author
+        allow delete: if signedIn() && (request.auth.uid == resource.data.author || isMod()
           || request.auth.uid == get(/databases/$(database)/documents/community/$(postId)).data.author);
       }
     }
