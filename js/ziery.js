@@ -30,10 +30,10 @@ window.ZIERY = (function () {
      x/y place the item's bottom-centre in the room. size is in % of the room width. */
   const ITEMS = [
     ['banig', 'Banig', null, 1, 0, 24, 92, 0, 1, null, 'Where Ziery sleeps for now.'],
-    ['tokador', 'Lumang tokador', '🗄️', 1, 0, 9, 74, 9, 2, null, 'Hand-me-down drawers.'],
-    ['fan', 'Lumang electric fan', '🪭', 1, 0, 90, 80, 6, 3, null, 'Squeaks on level 2.'],
-    ['kape', 'Kape 3-in-1', '☕', 1, 0, 6, 60, 3.5, 4, null, 'Breakfast of champions.'],
-    ['alkansya', 'Plastic na alkansya', '🐷', 2, 120, 12, 60, 4, 4, null, 'Every coin counts.'],
+    ['tokador', 'Lumang tokador', '🗄️', 1, 0, 9, 74, 12, 2, null, 'Hand-me-down drawers.'],
+    ['fan', 'Lumang electric fan', '🪭', 1, 0, 90, 80, 8, 3, null, 'Squeaks on level 2.'],
+    ['kape', 'Kape 3-in-1', '☕', 1, 0, 6, 55, 4.5, 4, null, 'Breakfast of champions.'],
+    ['alkansya', 'Plastic na alkansya', '🐷', 2, 120, 12, 55, 5, 4, null, 'Every coin counts.'],
     ['halaman', 'Halaman', '🪴', 3, 100, 96, 93, 6, 3, null, 'A little green.'],
     ['desk', 'Study desk', null, 4, 350, 66, 76, 0, 2, null, 'A real place to log your budget.'],
     ['lamp', 'Desk lamp', '💡', 4, 150, 56, 61, 4, 4, null, 'For late-night logging.'],
@@ -47,7 +47,7 @@ window.ZIERY = (function () {
     ['aircon', 'Aircon', '❄️', 9, 1200, 86, 24, 6, 2, 'fan', 'No more pawis.'],
     ['ergochair', 'Ergonomic chair', '💺', 10, 1000, 72, 90, 8, 3, 'chair', 'Your back says thank you.'],
     ['monitors', 'Dual monitor', '🖥️', 10, 1500, 69, 60, 6, 3, null, 'Two screens, twice the spreadsheets.'],
-    ['jar', 'Smart savings jar', '🫙', 10, 700, 12, 60, 4, 4, 'alkansya', 'Counts every deposit.'],
+    ['jar', 'Smart savings jar', '🫙', 10, 700, 12, 55, 5, 4, 'alkansya', 'Counts every deposit.'],
     ['frame', 'Framed goal', '🖼️', 11, 250, 22, 32, 6, 2, null, 'A picture of the dream.'],
     ['rug', 'Rug', null, 12, 400, 48, 97, 0, 1, null, 'Ties the room together.'],
     ['speaker', 'Speaker', '🔊', 12, 500, 80, 93, 3.5, 4, null, 'Payday playlist.'],
@@ -187,7 +187,7 @@ window.ZIERY = (function () {
         nodes.push(i.emoji ? h('span', { class: cls, style: style, title: i.name }, i.emoji) : h('span', { class: cls, style: style, title: i.name }));
       });
       const coder = s.owned.laptop || s.owned.monitors;
-      nodes.push(h('span', { class: 'zr-ziery' + (coder ? ' at-desk' : ''), title: 'Ziery' }, coder ? '🧑‍💻' : '🧑'));
+      nodes.push(h('span', { class: 'zr-ziery' + (coder ? ' at-desk' : ''), title: 'Ziery' }, coder ? '🧑‍💻' : '🧍'));
       if (delivering) nodes.push(h('div', { class: 'zr-truck', 'aria-hidden': 'true' }, h('span', { class: 'zr-truck-box' }, '📦'), '🚚'));
       room.replaceChildren.apply(room, nodes);
       justPlaced = null;

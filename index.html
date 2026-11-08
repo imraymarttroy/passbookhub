@@ -20,13 +20,13 @@
     window.addEventListener('appinstalled', function () { window.__pbhInstall = null; document.dispatchEvent(new Event('pbh-installable')); });
     if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
   </script>
-  <link rel="stylesheet" href="styles.css?v=95">
+  <link rel="stylesheet" href="styles.css?v=96">
 </head>
 <body>
   <main id="app"></main>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <noscript><p class="noscript">This budget tracker needs JavaScript to run.</p></noscript>
   <script src="config.js?v=4"></script>
-  <script type="module" src="js/firebase.js?v=82"></script>
+  <script type="module" src="js/firebase.js?v=83"></script>
 </body>
 </html>

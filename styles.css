@@ -4124,7 +4124,7 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .zr-rug { width: 34%; height: 7%; transform: translate(-50%, -100%); border-radius: 50%; background: radial-gradient(#a99be0, #8f80cf); opacity: 0.85; filter: none; }
 .zr-lights { width: 100%; height: 6%; transform: translate(-50%, 0); background: radial-gradient(circle, #ffe79a 0 0.5cqw, transparent 0.6cqw) 0 0 / 5cqw 100% repeat-x; filter: drop-shadow(0 0 0.6cqw #ffd85a); animation: zr-twinkle 2.4s ease-in-out infinite alternate; }
 @keyframes zr-twinkle { from { opacity: 0.6; } to { opacity: 1; } }
-.zr-ziery { position: absolute; left: 50%; top: 95%; transform: translate(-50%, -100%); font-size: 10cqw; line-height: 1; z-index: 40; animation: zr-idle 3s ease-in-out infinite; }
+.zr-ziery { position: absolute; left: 50%; top: 95%; transform: translate(-50%, -100%); font-size: 9cqw; line-height: 1; z-index: 40; animation: zr-idle 3s ease-in-out infinite; }
 .zr-ziery.at-desk { left: 66%; top: 96%; font-size: 9cqw; z-index: 32; }
 @keyframes zr-idle { 50% { transform: translate(-50%, -103%); } }
 .zr-pop { animation: zr-pop 0.6s cubic-bezier(.2, 1.6, .4, 1); }
@@ -4153,8 +4153,8 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .zr-row-emoji { flex: none; display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 10px; background: var(--wash); font-size: 1.375rem; }
 .zr-row.locked .zr-row-emoji { filter: grayscale(1); opacity: 0.5; }
 .zr-row-main { flex: 1; min-width: 0; display: grid; gap: 0.25rem; }
-.zr-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
-.zr-row-name { font-weight: 600; font-size: 0.875rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zr-row-top { display: flex; align-items: baseline; justify-content: space-between; gap: 0.25rem 0.5rem; flex-wrap: wrap; min-width: 0; }
+.zr-row-name { font-weight: 600; font-size: 0.875rem; min-width: 0; overflow-wrap: anywhere; }
 .zr-row-price { font-size: 0.8125rem; color: var(--ink-2); white-space: nowrap; }
 .zr-row-note { margin: 0; font-size: 0.75rem; line-height: 1.4; }
 .zr-row .btn { flex: none; min-height: 2.25rem; min-width: 5.5rem; padding: 0.25rem 0.75rem; font-size: 0.8125rem; }
@@ -4183,7 +4183,8 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .zr-step-t { font-weight: 600; font-size: 0.875rem; margin: 0.125rem 0 0.125rem; }
 .zr-steps .small { font-size: 0.75rem; line-height: 1.4; }
 
-@media (max-width: 900px) { .zr-main { grid-template-columns: minmax(0, 1fr); } .zr-items { max-height: none; } }
+@media (max-width: 1180px) { .zr-main { grid-template-columns: minmax(0, 1fr); } .zr-items { max-height: none; } }
+@media (min-width: 1181px) { .zr-main { grid-template-columns: minmax(0, 1.3fr) minmax(22rem, 1fr); } }
 @media (max-width: 760px) {
   .zr-hud, .zr-card, .zr-boxbar { padding: 1rem; }
   .zr-stats { width: 100%; }
