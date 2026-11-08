@@ -4246,3 +4246,6 @@ h1.cm-title { font-size: 1.375rem; }
 .cm-charter { display: inline-block; margin: 0.625rem 0.5rem 0; color: var(--ink); font-weight: 600; text-decoration: none; }
 .cm-charter:hover { text-decoration: underline; }
 .cm-agree a { color: var(--ink); font-weight: 600; }
+.cm-agree input[type="checkbox"] { width: 1rem !important; height: 1rem !important; min-height: 0 !important; padding: 0 !important; margin: 0.1875rem 0 0 !important; flex: none; accent-color: var(--ink); }
+.cm-agree > span { flex: 1; min-width: 0; }
+.cm-radio input[type="radio"] { width: 1rem !important; height: 1rem !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; flex: none; accent-color: var(--ink); }
