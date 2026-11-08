@@ -37,8 +37,8 @@ window.ZIERY = (function () {
      zone: floor (a floor tile), wall (a wall slot) or top (on a table).
      block: drawn as a pixel box [height, top, left, right]; surface: other items can sit on it. */
   const ITEMS = [
-    ['karton', 'Karton na mesa', '📦', 1, 0, 0, 'floor', {}, 'A cardboard box desk. It works!', { block: [15, '#d9a066', '#b97a45', '#9c6234'], surface: true }],
-    ['tokador', 'Lumang tokador', '🗄️', 1, 0, 0, 'floor', { ipon: 5 }, 'Hand-me-down drawers.', { block: [20, '#8f6a8f', '#6f4f70', '#5a3f5b'], surface: true }],
+    ['karton', 'Karton na mesa', '📦', 1, 0, 0, 'floor', {}, 'A cardboard box desk. It works!', { block: [19, '#d9a066', '#b97a45', '#9c6234'], surface: true }],
+    ['tokador', 'Lumang tokador', '🗄️', 1, 0, 0, 'floor', { ipon: 5 }, 'Hand-me-down drawers.', { block: [25, '#8f6a8f', '#6f4f70', '#5a3f5b'], surface: true }],
     ['banig', 'Banig', '🟫', 1, 0, 0, 'floor', {}, 'Where Ziery sleeps for now.', { mat: true }],
     ['fan', 'Lumang electric fan', '🪭', 1, 0, 0, 'floor', { all: 2 }, 'Squeaks on level 2.'],
     ['kape', 'Kape 3-in-1', '☕', 1, 0, 0, 'top', { budget: 5 }, 'Breakfast of champions.'],
@@ -54,7 +54,7 @@ window.ZIERY = (function () {
     ['mic', 'Microphone', '🎙️', 5, 600, 4, 'top', { all: 8 }, 'No more echo.'],
     ['sapatos', 'Bagong sapatos', '👟', 5, 400, 3, 'floor', { travel: 12 }, 'Paid in cash, not utang.'],
     ['books', 'Money books', '📚', 5, 300, 3, 'top', { budget: 10, ipon: 10 }, 'Read, then vlog about it.'],
-    ['mesa', 'Wooden desk', '🪵', 6, 700, 6, 'floor', { all: 5 }, 'Goodbye, karton.', { block: [16, '#a8794f', '#7f5735', '#6a4629'], surface: true }],
+    ['mesa', 'Wooden desk', '🪵', 6, 700, 6, 'floor', { all: 5 }, 'Goodbye, karton.', { block: [20, '#a8794f', '#7f5735', '#6a4629'], surface: true }],
     ['headphones', 'Headphones', '🎧', 6, 350, 4, 'top', { gaming: 12 }, 'Focus mode on.'],
     ['kama', 'Kama', '🛏️', 6, 800, 8, 'floor', { all: 5 }, 'Goodbye, banig.', { bed: true }],
     ['map', 'World map', '🗺️', 6, 400, 4, 'wall', { travel: 15 }, 'Pins on the next trip.'],
@@ -82,11 +82,11 @@ window.ZIERY = (function () {
 
   /* ---------- Room geometry (logical pixels; the canvas is scaled up, pixel-perfect) ---------- */
   const N = 6;                 /* 6 × 6 floor tiles */
-  const TW = 16, TH = 8;       /* half a tile's width and height */
-  const W = 256, H = 232, OX = 128, OY = 100, WALL = 80;
+  const TW = 20, TH = 10;       /* half a tile's width and height */
+  const W = 256, H = 250, OX = 128, OY = 106, WALL = 94;
   function cell(x, y) { return { x: OX + (x - y) * TW, y: OY + (x + y) * TH + TH }; }   /* centre of a tile */
   function wallSpot(side, i) {
-    return side === 'L' ? { x: OX - (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 42 } : { x: OX + (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 42 };
+    return side === 'L' ? { x: OX - (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 50 } : { x: OX + (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 50 };
   }
   const WINDOW_SLOTS = { R3: true, R4: true };
 
@@ -200,14 +200,15 @@ window.ZIERY = (function () {
     '...BB...BB...'
   ];
   const ZPAL = { H: '#2a2233', S: '#c98a5e', W: '#ffffff', K: '#1d1b26', M: '#8a3b2e', T: '#4fb9d6', L: '#e8e9f3', P: '#33395a', B: '#17161d' };
-  function sprite(ctx, rows, pal, x, y, blink) {
+  function sprite(ctx, rows, pal, x, y, blink, sc) {
+    sc = sc || 1;
     rows.forEach(function (row, j) {
       for (let i = 0; i < row.length; i++) {
         let c = row[i];
         if (c === '.') continue;
         if (blink && (c === 'W' || c === 'K')) c = 'S';
         ctx.fillStyle = pal[c];
-        ctx.fillRect(x + i, y + j, 1, 1);
+        ctx.fillRect(x + i * sc, y + j * sc, sc, sc);
       }
     });
   }
@@ -329,9 +330,9 @@ window.ZIERY = (function () {
       hudMe.replaceChildren(face, h('span', { class: 'zg-lv' }, String(s.level)), h('i', { class: 'zg-lvbar', style: 'width:' + pct + '%' }));
       const waiting = store.deliveries.length + s.hb.boxesWaiting;
       const ready = store.deliveries.filter(function (d) { return d.at <= Date.now(); }).length + s.hb.boxesWaiting;
-      truckBtn.replaceChildren(h('span', { 'aria-hidden': 'true' }, '🚚'), waiting ? h('b', { class: 'zg-badge' + (ready ? ' ready' : '') }, String(waiting)) : null);
+      truckBtn.replaceChildren.apply(truckBtn, [h('span', { 'aria-hidden': 'true' }, '🚚')].concat(waiting ? [h('b', { class: 'zg-badge' + (ready ? ' ready' : '') }, String(waiting))] : []));
       const st = stored().length;
-      boxBtn.replaceChildren(h('span', { 'aria-hidden': 'true' }, '📦'), st ? h('b', { class: 'zg-badge' }, String(st)) : null);
+      boxBtn.replaceChildren.apply(boxBtn, [h('span', { 'aria-hidden': 'true' }, '📦')].concat(st ? [h('b', { class: 'zg-badge' }, String(st))] : []));
     }
 
     /* ---------- Banner: record or upload ---------- */
@@ -416,11 +417,11 @@ window.ZIERY = (function () {
       for (let u = 0; u <= N * TW; u++) { g.fillRect(OX - u, OY - WALL + Math.floor(u / 2), 1, 2); g.fillRect(OX + u, OY - WALL + Math.floor(u / 2), 1, 2); }
       /* window on the right wall */
       const w0 = wallSpot('R', 3), w1 = wallSpot('R', 4);
-      poly([[w0.x - 9, w0.y - 14], [w1.x + 9, w1.y - 14 + 9], [w1.x + 9, w1.y + 14 + 9], [w0.x - 9, w0.y + 14]], '#7a5232');
-      poly([[w0.x - 7, w0.y - 12], [w1.x + 7, w1.y - 12 + 7], [w1.x + 7, w1.y + 12 + 7], [w0.x - 7, w0.y + 12]], '#bfe6f5');
+      poly([[w0.x - 11, w0.y - 18], [w1.x + 11, w1.y - 18 + 11], [w1.x + 11, w1.y + 16 + 11], [w0.x - 11, w0.y + 16]], '#7a5232');
+      poly([[w0.x - 9, w0.y - 16], [w1.x + 9, w1.y - 16 + 9], [w1.x + 9, w1.y + 14 + 9], [w0.x - 9, w0.y + 14]], '#bfe6f5');
       g.fillStyle = '#7a5232';
       const mx = (w0.x + w1.x) / 2;
-      g.fillRect(Math.round(mx), Math.round((w0.y + w1.y) / 2 - 12), 2, 26);
+      g.fillRect(Math.round(mx), Math.round((w0.y + w1.y) / 2 - 14), 2, 32);
       g.fillStyle = 'rgba(255,255,255,0.5)';
       g.fillRect(Math.round(w0.x - 3), Math.round(w0.y - 8), 1, 8);
       if (tier(s.level) === 3) {   /* fairy lights along the top */
@@ -466,7 +467,7 @@ window.ZIERY = (function () {
     function topSpot(base, sl) {
       const c = cell(base.at.x, base.at.y);
       const hgt = BY_ID[base.id].block ? BY_ID[base.id].block[0] : 10;
-      return { x: c.x + (sl ? 6 : -6), y: c.y - hgt + (sl ? 2 : -1) };
+      return { x: c.x + (sl ? 8 : -8), y: c.y - hgt + (sl ? 3 : -1) };
     }
     function drawTargets() {
       const blink = Math.floor(Date.now() / 350) % 2;
@@ -505,16 +506,16 @@ window.ZIERY = (function () {
         if (o.ziery) {
           const bob = store.rec ? (Math.floor(t / 180) % 2) : (Math.floor(t / 700) % 2);
           const blink = Math.floor(t / 150) % 26 === 0;
-          const zx = Math.round(zc.x - 6), zy = Math.round(zc.y - (desk ? 38 : 22)) - bob;
-          sprite(g, ZIERY, ZPAL, zx, zy, blink);
+          const zx = Math.round(zc.x - 13), zy = Math.round(zc.y - (desk ? 56 : 34)) - bob;
+          sprite(g, ZIERY, ZPAL, zx, zy, blink, 2);
           return;
         }
         const p = o.p, it = BY_ID[p.id];
         const pop = popKey === p.k ? Math.min(1, (t - popAt) / 400) : 1;
         if (p.at.t === 'wall') {
           const c = wallSpot(p.at.side, p.at.i);
-          emoji(it.emoji, c.x, c.y + 6, Math.round(13 * pop));
-          hits.push({ k: p.k, x0: c.x - 8, y0: c.y - 9, x1: c.x + 8, y1: c.y + 8 });
+          emoji(it.emoji, c.x, c.y + 8, Math.round(17 * pop));
+          hits.push({ k: p.k, x0: c.x - 10, y0: c.y - 11, x1: c.x + 10, y1: c.y + 10 });
           return;
         }
         const c = cell(p.at.x, p.at.y);
@@ -535,14 +536,14 @@ window.ZIERY = (function () {
           for (let k = -10; k <= 10; k += 4) g.fillRect(c.x + k, c.y - 3 + Math.abs(k) / 4, 2, 6 - Math.abs(k) / 2);
           hits.push({ k: p.k, x0: c.x - TW, y0: c.y - TH, x1: c.x + TW, y1: c.y + TH });
         } else if (it.bed) {
-          block(c.x, c.y, 8, '#f2f2f7', '#3d6fb0', '#2f5a93');
-          diamond(c.x - 6, c.y - 11, 6, 3, '#ffffff');
-          diamond(c.x + 3, c.y - 6, 9, 4, '#5b8fd6');
-          hits.push({ k: p.k, x0: c.x - TW, y0: c.y - 16, x1: c.x + TW, y1: c.y + TH });
+          block(c.x, c.y, 10, '#f2f2f7', '#3d6fb0', '#2f5a93');
+          diamond(c.x - 7, c.y - 14, 7, 4, '#ffffff');
+          diamond(c.x + 4, c.y - 8, 11, 5, '#5b8fd6');
+          hits.push({ k: p.k, x0: c.x - TW, y0: c.y - 20, x1: c.x + TW, y1: c.y + TH });
         } else {
-          const size = Math.round(18 * pop);
-          emoji(it.emoji, c.x, c.y + 4, size);
-          hits.push({ k: p.k, x0: c.x - 9, y0: c.y - 15, x1: c.x + 9, y1: c.y + 5 });
+          const size = Math.round(23 * pop);
+          emoji(it.emoji, c.x, c.y + 5, size);
+          hits.push({ k: p.k, x0: c.x - 12, y0: c.y - 19, x1: c.x + 12, y1: c.y + 6 });
         }
         if (picked === p.k) { g.strokeStyle = '#ffe25a'; g.lineWidth = 1; g.strokeRect(c.x - TW + 0.5, topY - TH - 2.5, TW * 2 - 1, c.y - topY + TH * 2 + 3); }
         /* things on top of this table */
@@ -552,10 +553,10 @@ window.ZIERY = (function () {
           const sp = topSpot(p, sl);
           const qi = BY_ID[q.id];
           const qp = popKey === q.k ? Math.min(1, (t - popAt) / 400) : 1;
-          emoji(qi.emoji, sp.x, sp.y + 2, Math.round(13 * qp));
+          emoji(qi.emoji, sp.x, sp.y + 2, Math.round(16 * qp));
           if (store.rec && (q.id === 'laptop' || q.id === 'monitor') && Math.floor(t / 300) % 2) { g.fillStyle = 'rgba(177,229,242,0.35)'; g.fillRect(Math.round(sp.x) - 5, Math.round(sp.y) - 10, 10, 7); }
-          hits.push({ k: q.k, x0: sp.x - 7, y0: sp.y - 11, x1: sp.x + 7, y1: sp.y + 3 });
-          if (picked === q.k) { g.strokeStyle = '#ffe25a'; g.strokeRect(Math.round(sp.x) - 7.5, Math.round(sp.y) - 11.5, 15, 15); }
+          hits.push({ k: q.k, x0: sp.x - 9, y0: sp.y - 14, x1: sp.x + 9, y1: sp.y + 3 });
+          if (picked === q.k) { g.strokeStyle = '#ffe25a'; g.strokeRect(Math.round(sp.x) - 9.5, Math.round(sp.y) - 14.5, 19, 18); }
         });
       });
       /* Delivery truck drives across the front. */
@@ -564,8 +565,8 @@ window.ZIERY = (function () {
         if (k >= 1) truckAt = 0;
         else {
           const x = -30 + k * (W + 60);
-          emoji('🚚', x, H - 8, 24);
-          if (k > 0.35 && k < 0.65) emoji('📦', W / 2, H - 30 + (k - 0.35) * 40, 12);
+          emoji('🚚', x, H - 6, 30);
+          if (k > 0.35 && k < 0.65) emoji('📦', W / 2, H - 40 + (k - 0.35) * 60, 16);
         }
       }
       if (store.rec) {
@@ -583,7 +584,7 @@ window.ZIERY = (function () {
       if (placing) {
         const it = byKey(placing);
         const best = targets().map(function (tg) { return { tg: tg, d: Math.hypot(tg.c.x - px, tg.c.y - py) }; }).sort(function (a, b) { return a.d - b.d; })[0];
-        if (!best || best.d > 18) { hint.textContent = 'Tap a glowing spot.'; flash(); return; }
+        if (!best || best.d > 22) { hint.textContent = 'Tap a glowing spot.'; flash(); return; }
         const tg = best.tg;
         it.at = tg.t === 'floor' ? { t: 'floor', x: tg.x, y: tg.y } : tg.t === 'wall' ? { t: 'wall', side: tg.side, i: tg.i } : { t: 'top', on: tg.on, s: tg.s };
         popKey = it.k; popAt = performance.now();
@@ -633,7 +634,7 @@ window.ZIERY = (function () {
       if (store.rec) {
         const left = store.rec.end - now;
         body.append(h('p', { class: 'zg-p' }, left > 0 ? 'Ziery is recording. Come back in ' + clock(left) + ' to upload.' : 'Your vlog is ready. Tap UPLOAD below the room.'),
-          left > 0 ? h('button', { type: 'button', class: 'zg-btn ghost', onclick: function () { store.rec = null; persist(); drawAll(); } }, 'Cancel recording') : null);
+          left > 0 ? h('button', { type: 'button', class: 'zg-btn ghost', onclick: function () { store.rec = null; persist(); drawAll(); } }, 'Cancel recording') : '');
         if (lastUpload) body.append(lastUpload);
         return;
       }
