@@ -22,7 +22,7 @@ window.WHATS_NEW = (function () {
   /* What changed in APP_VERSION, shown in the minimal update popup (version button in the sidebar). */
   const UPDATE = {
     en: { title: 'What\u2019s new', close: 'Close', ok: 'Got it', items: [
-      ['Ziery Simulator', 'A new game in Games: good money habits earn Cash Coins and Savings XP. Buy Ziery\u2019s wishlist items and watch the room grow from a banig to a dream setup.'],
+      ['Ziery Simulator', 'A new game in Games: record vlogs, ride the trending topics, grow subscribers and earn Ipon Coins. Buy items, wait for the delivery truck and arrange Ziery\u2019s room. Your real money habits boost every upload.'],
       ['Money format', 'Every amount now shows commas and 2 decimals, like \u20b110,000.00, including the amount boxes as you type.'],
       ['Quicker adding', '+ Add expense / income and + Add entry now open a short form, not the whole list.'],
       ['On your phone', 'Tap your picture to view your profile or set your status. Conversations fill the screen.'],
@@ -35,7 +35,7 @@ window.WHATS_NEW = (function () {
       ['Coming soon', 'Community and Blog are in the sidebar, locked for now.']
     ] },
     fil: { title: 'Ano ang bago', close: 'Isara', ok: 'Sige', items: [
-      ['Ziery Simulator', 'Bagong laro sa Games: kumikita ng Cash Coins at Savings XP sa magandang money habits. Bilhin ang wishlist ni Ziery at panoorin ang kwarto mula banig hanggang dream setup.'],
+      ['Ziery Simulator', 'Bagong laro sa Games: mag-record ng vlog, sumabay sa trending, magpadami ng subscribers at kumita ng Ipon Coins. Bumili ng gamit, hintayin ang delivery truck at ayusin ang kwarto ni Ziery. Pinapalakas ng totoong money habits mo ang bawat upload.'],
       ['Format ng pera', 'May comma at 2 decimal na ang lahat ng halaga, gaya ng \u20b110,000.00, pati habang nagta-type.'],
       ['Mas mabilis mag-add', 'Maikling form na lang ang lalabas sa + Add expense / income at + Add entry.'],
       ['Sa phone', 'I-tap ang picture mo para makita ang profile o mag-set ng status. Buong screen na ang chat.'],

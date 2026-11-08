@@ -5450,7 +5450,7 @@
       SOC.watchGoals(null, function (list) { data.goals = list; refresh(); }, function () { data.goals = []; refresh(); })
     ];
     state.refreshZiery = refresh;
-    state.cleanup = function () { stops.forEach(function (f) { if (typeof f === 'function') f(); }); state.refreshZiery = null; };
+    state.cleanup = function () { stops.forEach(function (f) { if (typeof f === 'function') f(); }); if (game.stop) game.stop(); state.refreshZiery = null; };
     game.el.insertBefore(gamesSwitch('ziery'), game.el.firstChild);
     return game.el;
   }
