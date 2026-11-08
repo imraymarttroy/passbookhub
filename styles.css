@@ -4284,3 +4284,9 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
   .zr-go .btn { width: 100%; }
   .zr-roombar { padding: 0.625rem 0.75rem; }
 }
+/* Grid room: the floor starts halfway down so the floor tiles match what you see. */
+.zr-room .zr-wall { inset: 0 0 50% 0; }
+.zr-room .zr-floor { inset: 50% 0 0 0; background: repeating-linear-gradient(90deg, var(--floor) 0 10%, var(--floor-2) 10% 10.3%); }
+.zr-room button.zr-item { font-size: calc(var(--s) * 8cqw); }
+.zr-mat { display: block; width: 18cqw; height: 4cqw; border-radius: 0.5cqw; background: repeating-linear-gradient(45deg, #d9b97c 0 1cqw, #c9a15c 1cqw 2cqw); transform: skewX(-18deg); box-shadow: 0 0.4cqw 0 rgba(0, 0, 0, 0.12); }
+.zr-ziery { top: 97%; font-size: 12cqw; }

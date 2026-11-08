@@ -251,7 +251,7 @@ window.ZIERY = (function () {
             selected = selected && selected.k === p.k ? null : { k: p.k, mode: 'item' };
             draw();
           }
-        }, it.emoji));
+        }, p.id === 'banig' ? h('span', { class: 'zr-mat', 'aria-hidden': 'true' }) : it.emoji));
       });
       /* While placing, every free tile in the right zone is a target. */
       if (sel && selected.mode === 'place') {
@@ -324,7 +324,7 @@ window.ZIERY = (function () {
               h('p', { class: 'small muted num' }, left > 0 ? clock(left) + ' left' : 'About ' + fmt(viewsFor(s, r.topic, r.len)) + ' views expected')),
             left > 0 ? h('button', { type: 'button', class: 'btn', onclick: function () { store.rec = null; persist(); draw(); } }, 'Cancel')
               : h('button', { type: 'button', class: 'btn primary', onclick: upload }, 'Upload')),
-          lastUpload);
+          lastUpload || '');
         return;
       }
       studio.replaceChildren(head,
@@ -347,7 +347,7 @@ window.ZIERY = (function () {
           h('p', { class: 'small muted num' }, 'About ' + fmt(viewsFor(s, topic, length)) + ' views'
             + (s.hb.boost ? ' · real-life boost +' + s.hb.boost + '%' : '')),
           h('button', { type: 'button', class: 'btn primary', onclick: record }, '● Record')),
-        lastUpload);
+        lastUpload || '');
     }
     function record() {
       const L = LENGTHS.find(function (x) { return x[0] === length; });
