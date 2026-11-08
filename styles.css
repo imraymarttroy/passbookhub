@@ -4211,3 +4211,11 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .tl-pill { width: 100% !important; }
 .tl-custom { grid-column: 1 / -1; }
 .acct-field .ov-quick { flex-wrap: wrap; margin: 0.5rem 0 0; overflow: visible; }
+
+/* Profile stats on phones: one row each, label left and value right, so nothing wraps into the eye button. */
+@media (max-width: 560px) {
+  .pf-card.pf-stats { grid-template-columns: minmax(0, 1fr) !important; }
+  .pf-card.pf-stats .pf-stat { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 0.75rem; padding: 0.875rem 1rem; }
+  .pf-card.pf-stats .pf-stat + .pf-stat { border-left: 0; border-top: 1px solid var(--line); }
+  .pf-card.pf-stats .pf-stat-label { grid-column: 1 / -1; }
+}
