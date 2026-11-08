@@ -3115,7 +3115,7 @@ a.sidebar-me-text, a.sidebar-me-text:hover, a.sidebar-me-text:focus, a.sidebar-m
 .entries-sheet[data-mode="add"] { width: min(32rem, calc(100vw - 2rem)); }
 .entries-sheet[data-mode="add"] .sheet-only-entries { display: none; }
 .entries-sheet[data-mode="add"] .sheet-form { margin: 0; padding: 0; border: 0; }
-.entries-sheet .tx-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.entries-sheet .tx-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
 .entries-sheet .tx-fields .span-all { grid-column: 1 / -1; }
 .entries-sheet .tx-actions { justify-content: flex-end; padding-top: 0.25rem; }
 .entries-sheet .tx-actions .btn { min-width: 7.5rem; }
