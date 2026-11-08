@@ -46,7 +46,7 @@ try {
   await import('./badges.js?v=4');
   await import('./fx.js?v=3');
   await import('./community.js?v=3');
-  await import('./app.js?v=82');
+  await import('./app.js?v=83');
 } catch (error) {
   console.error(error);
   fail('PassbookHub could not start. Check your internet connection and reload the page.');

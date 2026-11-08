@@ -5012,8 +5012,15 @@
 
   /* ---------- Notifications ---------- */
 
+  /* Small type icon on the avatar, Facebook style (kept monochrome). */
+  const NOTE_KIND_ICON = { request: 'profile', accepted: 'check', trust: 'lock', trusted: 'eye', debt: 'file' };
+
   function viewNotifications() {
     const list = h('div');
+    /* Remember what was unread when the page opened, so those stay marked
+       for this visit even after markAllRead() runs (like Facebook). */
+    const freshIds = new Set(SOC.notifications().filter(function (n) { return !n.read; }).map(function (n) { return n.id; }));
+    const DAY = 24 * 60 * 60 * 1000;
 
     function draw(notes) {
       if (!list.isConnected && list.parentNode) return;
@@ -5021,9 +5028,15 @@
         list.replaceChildren(h('p', { class: 'empty' }, 'No alerts yet. When someone adds you to their circle, you will see it here.'));
         return;
       }
-      const ul = h('ul', { class: 'notes' });
-      notes.forEach(function (note) {
-        const li = h('li', { class: 'note' + (note.read ? '' : ' unread') }, h('p', { class: 'muted small' }, 'Loading…'));
+      const isNew = function (n) { return !n.read || freshIds.has(n.id) || Date.now() - (n.createdAt || 0) < DAY; };
+      const groups = [
+        { title: 'New', ul: h('ul', { class: 'notes' }), items: notes.filter(isNew) },
+        { title: 'Earlier', ul: h('ul', { class: 'notes' }), items: notes.filter(function (n) { return !isNew(n); }) }
+      ].filter(function (g) { return g.items.length; });
+      groups.forEach(function (group) { group.items.forEach(function (note) {
+        const ul = group.ul;
+        const unread = !note.read || freshIds.has(note.id);
+        const li = h('li', { class: 'note' + (unread ? ' unread' : '') }, h('p', { class: 'muted small' }, 'Loading…'));
         ul.appendChild(li);
         SOC.getProfile(note.from).then(function (person) {
           if (!person) { li.remove(); return; }
@@ -5077,17 +5090,29 @@
             actions = h('div', { class: 'row' }, accept, decline);
           } else {
             actions = h('button', {
-              type: 'button', class: 'icon-btn', 'aria-label': 'Dismiss', title: 'Dismiss',
+              type: 'button', class: 'icon-btn note-x', 'aria-label': 'Dismiss', title: 'Dismiss',
               onclick: function () { SOC.dismissNotification(note.id).catch(function (e) { toast(e.message); }); }
-            }, icon('over'));
+            }, icon('close'));
+            /* The whole row opens the person, like Facebook. */
+            li.classList.add('tappable');
+            li.addEventListener('click', function (e) {
+              if (e.target.closest('a, button')) return;
+              location.hash = '#u/' + person.username;
+            });
           }
+          const kind = NOTE_KIND_ICON[note.type] || 'check';
           li.replaceChildren(
-            h('a', { href: '#u/' + person.username, tabindex: '-1', 'aria-hidden': 'true' }, avatar(person, person.avatar, 2.75)),
-            h('div', { class: 'note-body' }, text, h('p', { class: 'small muted' }, timeAgo(note.createdAt))),
-            actions);
+            h('a', { href: '#u/' + person.username, tabindex: '-1', 'aria-hidden': 'true', class: 'note-pic' },
+              avatar(person, person.avatar, 3.25),
+              h('span', { class: 'note-kind' }, icon(kind))),
+            h('div', { class: 'note-body' }, text, h('p', { class: 'small note-time' }, timeAgo(note.createdAt)),
+              actions && actions.classList.contains('row') ? actions : null),
+            actions && actions.classList.contains('row') ? null : actions);
         }).catch(function () { li.remove(); });
-      });
-      list.replaceChildren(ul);
+      }); });
+      list.replaceChildren.apply(list, [].concat.apply([], groups.map(function (g) {
+        return [h('h2', { class: 'notes-head' }, g.title), g.ul];
+      })));
     }
 
     draw(SOC.notifications());
@@ -5095,7 +5120,7 @@
     setTimeout(function () { SOC.markAllRead().catch(function () {}); }, 1500);
     if (SOC.notifications().length) trackBadge('alerts');
     return h('div', { class: 'wide' },
-      h('h1', { style: 'margin-bottom:1.25rem' }, 'Alerts'),
+      h('h1', { style: 'margin-bottom:1rem' }, 'Alerts'),
       list,
       (function () { state.drawNotes = draw; return null; })());
   }
