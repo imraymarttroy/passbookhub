@@ -4330,7 +4330,7 @@ button.bp-goal:hover { border-color: var(--line-strong); background: var(--wash)
 .zg-badge.ready { background: #3fbf4a; animation: zg-bounce 0.9s ease-in-out infinite; }
 @keyframes zg-bounce { 50% { transform: translateY(-3px); } }
 /* Room */
-.zg-roombox { position: relative; margin: 0 -0.5rem; background: #1a1f33; }
+.zg-roombox { position: relative; margin: 0 -0.5rem; background: #232842; }
 .zg-canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; image-rendering: crisp-edges; cursor: pointer; }
 .zg-hint { position: absolute; left: 50%; top: 0.5rem; transform: translateX(-50%); padding: 0.25rem 0.75rem; border-radius: 999px; background: rgba(13, 20, 48, 0.85); font-size: 0.8125rem; opacity: 0; transition: opacity 0.2s; pointer-events: none; white-space: nowrap; }
 .zg-hint.show { opacity: 1; }

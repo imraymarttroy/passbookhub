@@ -82,11 +82,11 @@ window.ZIERY = (function () {
 
   /* ---------- Room geometry (logical pixels; the canvas is scaled up, pixel-perfect) ---------- */
   const N = 6;                 /* 6 × 6 floor tiles */
-  const TW = 20, TH = 10;       /* half a tile's width and height */
-  const W = 256, H = 250, OX = 128, OY = 106, WALL = 94;
+  const TW = 22, TH = 11;       /* half a tile's width and height */
+  const W = 256, H = 252, OX = 128, OY = 112, WALL = 102;
   function cell(x, y) { return { x: OX + (x - y) * TW, y: OY + (x + y) * TH + TH }; }   /* centre of a tile */
   function wallSpot(side, i) {
-    return side === 'L' ? { x: OX - (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 50 } : { x: OX + (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 50 };
+    return side === 'L' ? { x: OX - (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 54 } : { x: OX + (i + 0.5) * TW, y: OY + (i + 0.5) * TH - 54 };
   }
   const WINDOW_SLOTS = { R3: true, R4: true };
 
@@ -389,7 +389,7 @@ window.ZIERY = (function () {
     function drawRoom(s, t) {
       const P = PAL[tier(s.level)];
       g.imageSmoothingEnabled = false;
-      g.clearRect(0, 0, W, H);
+      g.fillStyle = '#232842'; g.fillRect(0, 0, W, H);
       const L = [OX - N * TW, OY + N * TH], R = [OX + N * TW, OY + N * TH];
       /* walls */
       poly([[OX, OY], [L[0], L[1]], [L[0], L[1] - WALL], [OX, OY - WALL]], P.wl);
