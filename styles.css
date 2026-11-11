@@ -4452,5 +4452,3 @@ body:has(.chat-pop:not([hidden])) .fab { display: none; }
 /* Recent transactions: few entries sit at the top, "See all" stays on the bottom line like the other cards */
 .dh-recent > div:last-child { flex: 1; display: flex; flex-direction: column; }
 .dh-recent .dh-foot { margin-top: auto; padding-top: 1rem; }
-.dh-low { align-items: start; }
-.dh-low > .dh-recent { min-height: 100%; }
