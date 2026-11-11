@@ -521,7 +521,36 @@
     ' months of needs': ' na buwan ng needs',
     'Over by ': 'Lampas ng ',
     'Left ': 'Natira ',
-    'Save ': 'Mag-ipon ng '
+    'Save ': 'Mag-ipon ng ',
+    // Dashboard
+    'Month': 'Buwan',
+    '1st cutoff': '1st cutoff',
+    '2nd cutoff': '2nd cutoff',
+    'Total income': 'Kabuuang kita',
+    'Total spent': 'Kabuuang gastos',
+    'Net cash flow': 'Net cash flow',
+    'Category limits': 'Limit kada category',
+    'Recent transactions': 'Mga huling transaction',
+    'Wallets & accounts': 'Wallets at accounts',
+    'Active goals': 'Mga aktibong goal',
+    'Edit split': 'Baguhin ang hatian',
+    'Set limits': 'Mag-set ng limit',
+    'Add expense': 'Magdagdag ng gastos',
+    '+ Add expense': '+ Magdagdag ng gastos',
+    'Split & limits': 'Hatian at limit',
+    'Hide amounts': 'Itago ang halaga',
+    'Show amounts': 'Ipakita ang halaga',
+    'Add income to see this': 'Magdagdag ng kita para makita ito',
+    'Over your spending budget': 'Lampas na sa budget mo sa gastos',
+    'Needs + wants': 'Needs + wants',
+    'No limit': 'Walang limit',
+    'Record your first expense to get started.': 'I-record ang una mong gastos para makapagsimula.',
+    'No transactions this cutoff yet.': 'Wala ka pang transactions ngayong cutoff.',
+    'No transactions this month yet.': 'Wala ka pang transactions ngayong buwan.',
+    'Cutoff view: half of each monthly limit': 'Cutoff view: kalahati ng bawat buwanang limit',
+    'Every entry for the month. Edit or delete any of them here.': 'Lahat ng entry sa buwan. Dito mo ma-e-edit o made-delete ang alinman.',
+    'Add expense or income': 'Magdagdag ng gastos o kita',
+    'Savings & debt': 'Savings at utang'
   };
 
   /* Strings built around a name, number or date. Each returns the Filipino text or null. */

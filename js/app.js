@@ -48,6 +48,7 @@
     warning: '<path d="M10 3 18 17H2z"/><path d="M10 8.5v3.5M10 14.5v.01"/>',
     over: '<circle cx="10" cy="10" r="7.5"/><path d="m7 7 6 6M13 7l-6 6"/>',
     close: '<path d="m5 5 10 10M15 5 5 15"/>',
+    plus: '<path d="M10 4v12M4 10h12"/>',
     eye: '<path d="M2 10s3-5.5 8-5.5S18 10 18 10s-3 5.5-8 5.5S2 10 2 10z"/><circle cx="10" cy="10" r="2.5"/>',
     eyeClosed: '<path d="M2.5 8c1.9 2.6 4.4 3.9 7.5 3.9s5.6-1.3 7.5-3.9"/><path d="m4.9 10.6-1.5 2M10 11.9v2.5M15.1 10.6l1.5 2"/>',
     search: '<circle cx="8.5" cy="8.5" r="5"/><path d="m12.5 12.5 4 4"/>',
@@ -271,8 +272,9 @@
     if (wanted === 'community' || /^community\/[A-Za-z0-9]{6,40}$/.test(wanted)) return 'community';
     if (wanted === 'notifications') return 'alerts';
     if (wanted === 'dashboard') return 'dashboard';
-    if (wanted === 'transactions') { state.jump = 'ledger'; return 'budget-plan'; }
-    if (wanted === 'budget-plan') return 'budget-plan';
+    /* Overview and Budget & Transactions became one Dashboard page: old links land there. */
+    if (wanted === 'transactions') { state.pendingSheet = 'entries'; return 'dashboard'; }
+    if (wanted === 'budget-plan' || wanted === 'overview') return 'dashboard';
     if (wanted === 'games' || wanted === 'stash-streak') return 'stash-streak';
     /* After signing in (or with no page in the address), start on the profile. */
     return ['profile', 'circle', 'alerts', 'settings'].indexOf(wanted) !== -1 ? wanted : 'profile';
@@ -2103,42 +2105,14 @@
     return wrap;
   }
 
-  /* Dashboard as a channel: click it and its sections open underneath. [view, label, locked] */
-  const DASH_CHANNEL = [['dashboard', 'Overview', false], ['budget-plan', 'Budget & Transactions', false]];
+  /* Dashboard: one page (big numbers, split and limits, recent activity, wallets and goals). */
   function dashboardChannel(current) {
-    const here = current === 'dashboard' || current === 'budget-plan';
-    let open = here;
-    try { if (!open) open = localStorage.getItem('pbh.dashOpen') === '1'; } catch (e) { /* storage off */ }
-    const sub = h('ul', { class: 'nav-sub', id: 'nav-sub-dashboard', hidden: !open },
-      DASH_CHANNEL.map(function (c) {
-        if (!c[2]) {
-          return h('li', null, h('a', { class: 'nav-sub-item', href: '#' + c[0], 'aria-current': current === c[0] ? 'page' : null },
-            h('span', { class: 'nav-hash', 'aria-hidden': 'true' }, '#'), h('span', { class: 'nav-label' }, c[1])));
-        }
-        return h('li', null, h('button', {
-          type: 'button', class: 'nav-sub-item locked', 'aria-disabled': 'true', title: c[1] + ' is coming soon',
-          onclick: function () { toast(c[1] + ' is coming soon.'); }
-        }, h('span', { class: 'nav-hash', 'aria-hidden': 'true' }, '#'), h('span', { class: 'nav-label' }, c[1]),
-          h('span', { class: 'nav-lock' }, icon('lock'), h('span', { class: 'vh' }, '(locked)'))));
-      }));
-    const chev = h('button', {
-      type: 'button', class: 'nav-chev' + (open ? ' open' : ''), 'aria-controls': 'nav-sub-dashboard',
-      'aria-expanded': open ? 'true' : 'false', 'aria-label': open ? 'Hide dashboard sections' : 'Show dashboard sections',
-      onclick: function () { setOpen(sub.hidden); }
-    }, icon('down'));
-    function setOpen(on) {
-      sub.hidden = !on;
-      chev.classList.toggle('open', on);
-      chev.setAttribute('aria-expanded', on ? 'true' : 'false');
-      chev.setAttribute('aria-label', on ? 'Hide dashboard sections' : 'Show dashboard sections');
-      try { localStorage.setItem('pbh.dashOpen', on ? '1' : '0'); } catch (e) { /* storage off */ }
-    }
+    const here = current === 'dashboard';
     const link = h('a', {
-      class: 'nav-item', href: '#dashboard', title: 'Dashboard', 'aria-current': here ? 'page' : null,
-      onclick: function () { setOpen(true); }
+      class: 'nav-item', href: '#dashboard', title: 'Dashboard', 'aria-current': here ? 'page' : null
     }, navIcon('dashboard'), h('span', { class: 'nav-label' }, 'Dashboard'),
       h('span', { class: 'nav-pin', title: 'Private: only you can see your dashboard' }, icon('pin'), h('span', { class: 'vh' }, '(private)')));
-    return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
+    return h('li', null, link);
   }
 
   /* Games: a channel like Dashboard, one sub-tab per game. Stash & Streak is the badges game. */
@@ -2268,6 +2242,19 @@
     return badge;
   }
 
+  /* Quick add: a floating + that opens the entry form from any page (it lives on the Dashboard). */
+  function quickAddButton(current) {
+    if (current === 'messages' || current === 'person' || current === 'shared') return null;
+    return h('button', {
+      type: 'button', class: 'fab', title: 'Add expense or income', 'aria-label': 'Add expense or income',
+      onclick: function () {
+        if (state.view === 'dashboard' && state.openAdd) { state.openAdd(); return; }
+        state.pendingSheet = 'add';
+        if (location.hash === '#dashboard') render(); else location.hash = '#dashboard';
+      }
+    }, icon('plus'), h('span', { class: 'fab-label' }, 'Add expense'));
+  }
+
   function shell(view, content) {
     const user = BT.currentUser();
     const current = view;
@@ -2325,7 +2312,7 @@
     drawBadges();
     const shellEl = h('div', { class: 'app-shell' },
       h('div', { class: 'bg-orbs', 'aria-hidden': 'true' }, h('span'), h('span')),
-      side, h('div', { class: 'app-main' }, top, content));
+      side, h('div', { class: 'app-main' }, top, content), quickAddButton(current));
     applyCollapsed();
     return shellEl;
   }
@@ -5704,10 +5691,7 @@
       thisMonth.hidden = state.month === BT.monthOf(BT.today());
       drawSummary(book.month(state.month));
       drawList();
-      if (overview) overview.refresh();
-      if (plannerOv) plannerOv.refresh();
-      if (ledger && !planPanel.hidden) ledger.draw();
-      if (planner && !planPanel.hidden) { planner.draw(); drawPlanHead(); }
+      if (home) home.refresh();
     }
 
     /* ---- Transactions: the full ledger, in the same minimalist cards as the Overview ---- */
@@ -5964,58 +5948,28 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
 
-    let overview = null;      /* the Overview page */
-    let plannerOv = null;     /* the charts, limits, bills and goals on the Budget page */
-    let ledger = null;
-    let planner = null;
-    let planPanel = { hidden: true };
+    let home = null;          /* the Dashboard page */
     state.refreshDashboard = drawAll;
     form.elements.date.value = defaultDate();
     drawHint();
     drawAll();
 
-    /* ---- Pages: Overview, and Budget & Transactions (your plan, charts, limits, bills, goals and the full ledger) ---- */
-    const tracker = savingsTracker(book);
-    function ovCtx(mode) {
-      return {
-        h: h, icon: icon, ask: ask, toast: toast, book: book, mode: mode,
-        onCleanup: function (fn) { const prev = state.cleanup; state.cleanup = function () { fn(); if (prev) prev(); }; },
-        openTab: function (name) { pickTab(name); },
-        editCategory: function (name, type) { if (planner) planner.editCategory(name, type); }
-      };
+    /* ---- One Dashboard page: big numbers, the split and limits, recent activity, wallets and goals ---- */
+    /* Your split and category limits open in a sheet over the Dashboard. */
+    const planner = budgetPlan({ book: book, money: money });
+    const planClose = h('button', { type: 'button', class: 'icon-btn entries-sheet-x', 'aria-label': 'Close', title: 'Close', onclick: function () { planSheet.close(); } }, icon('close'));
+    const planSheet = h('dialog', { class: 'entries-sheet plan-sheet', 'aria-labelledby': 'plan-sheet-title' },
+      h('div', { class: 'sheet-head' }, h('h2', { class: 'sheet-title', id: 'plan-sheet-title' }, 'Split & limits'), planClose),
+      h('div', { class: 'budget-panel' }, planner.el));
+    planSheet.addEventListener('click', function (e) { if (e.target === planSheet) planSheet.close(); });
+    planSheet.addEventListener('close', function () { refreshOv(); });
+    function openPlan() {
+      planner.draw();
+      if (!planSheet.open) { try { planSheet.showModal(); } catch (e) { planSheet.setAttribute('open', ''); } }
     }
-    const overviewPanel = h('div', { id: 'panel-overview', role: 'tabpanel', 'aria-labelledby': 'tab-overview', hidden: true });
-    ledger = transactionsLedger();
-    planner = budgetPlan({ book: book, money: money });
-    const planSub = h('p', { class: 'mo-sub' });
-    const planBody = h('div', { class: 'mo bp-page' },
-      h('div', { class: 'mo-head' }, h('h2', null, 'Budget & Transactions'), planSub),
-      planner.el);
-    planPanel = h('div', { id: 'panel-plan', role: 'tabpanel', 'aria-labelledby': 'tab-plan', hidden: true }, planBody);
-    function drawPlanHead() {
-      const m = BT.monthOf(BT.today());
-      const inc = book.month(m).reduce(function (t, x) { return t + (x.type === 'income' ? x.cents : 0); }, 0);
-      const sal = bookPlan(book).salaryCents;
-      const parts = [BT.monthLabel(m)];
-      if (inc > 0) parts.push('targets from ' + money(inc) + ' logged income');
-      else if (sal > 0) parts.push('targets from your ' + money(sal) + ' salary');
-      else parts.push('log income or enter your salary to see targets');
-      planSub.replaceChildren(parts.join(' · '), book.mine && BT.planIsLocal() ? h('span', { class: 'bp-local' }, ' · plan saved on this device only') : '');
-    }
-    function refreshOv() { if (overview) overview.refresh(); if (plannerOv) plannerOv.refresh(); }
+    function refreshOv() { if (home) home.refresh(); }
     const budgetPanel = h('div', { class: 'budget-panel' });
-    /* For now only the Overview is open; the other sections show as "Soon". */
-    const tabButtons = DASH_TABS.map(function (t) {
-      const soon = DASH_SOON.indexOf(t[0]) !== -1;
-      return h('button', {
-        type: 'button', role: 'tab', class: 'dash-tab' + (soon ? ' soon' : ''), id: 'tab-' + t[0],
-        'aria-controls': t[0] === 'budget' || t[0] === 'overview' ? 'panel-' + t[0] : 'panel-tracker',
-        'aria-disabled': soon ? 'true' : null, title: soon ? t[1] + ' is coming soon' : null,
-        onclick: function () { if (soon) toast(t[1] + ' is coming soon.'); else pickTab(t[0]); }
-      }, t[1], soon ? h('span', { class: 'soon-tag' }, 'Soon') : null);
-    });
-    const trackerPanel = h('div', { id: 'panel-tracker', role: 'tabpanel' }, tracker.el);
-    /* The 50/30/20 form and the entries list live in a sheet that opens over the Overview. */
+    /* The entry form and the month's entries live in a sheet that opens over the Dashboard. */
     const sheetClose = h('button', { type: 'button', class: 'icon-btn entries-sheet-x', 'aria-label': 'Close', title: 'Close', onclick: function () { sheet.close(); } }, icon('close'));
     const sheet = h('dialog', { class: 'entries-sheet', 'aria-labelledby': 'sheet-title' }, h('div', { class: 'sheet-head' }, sheetTitle, sheetClose), budgetPanel);
     sheet.addEventListener('click', function (e) { if (e.target === sheet) sheet.close(); });
@@ -6032,52 +5986,24 @@
         if (where !== 'entries' && form.elements && form.elements.desc) form.elements.desc.focus({ preventScroll: true });
       }, 0);
     }
-    function pickTab(name) {
-      if (DASH_SOON.indexOf(name) !== -1) { toast('That section is coming soon.'); name = 'overview'; }
-      if (name === 'budget' || name === 'entries') { openSheet(name); return; }
-      const jump = name === 'transactions' ? 'ledger' : null;
-      if (name === 'transactions') name = 'plan';
-      /* Your Budget page has its own address so the sidebar can link to it. */
-      if (book.mine && name === 'plan' && state.view !== 'budget-plan') { state.jump = jump; location.hash = '#budget-plan'; return; }
-      if (book.mine && name === 'overview' && state.view === 'budget-plan') { location.hash = '#dashboard'; return; }
-      state.dashTab = name;
-      tabButtons.forEach(function (b, i) {
-        const on = DASH_TABS[i][0] === name;
-        b.setAttribute('aria-selected', on ? 'true' : 'false');
-        b.tabIndex = on ? 0 : -1;
-      });
-      if (name === 'overview' && !overview) {
-        overview = OVERVIEW.render(ovCtx('overview'));
-        overviewPanel.appendChild(overview.el);
-      }
-      if (name === 'plan' && !plannerOv) {
-        plannerOv = OVERVIEW.render(ovCtx('planner'));
-        planBody.append(plannerOv.el, h('div', { id: 'bp-ledger', class: 'bp-ledger' }, ledger.el));
-      }
-      trackerPanel.hidden = true;
-      overviewPanel.hidden = name !== 'overview';
-      planPanel.hidden = name !== 'plan';
-      dashSwitch.forEach(function (b) { b.setAttribute('aria-current', b.dataset.tab === name ? 'page' : 'false'); });
-      if (name === 'plan') { planner.draw(); drawPlanHead(); ledger.draw(); }
-      if (name === 'plan' && (jump || state.jump)) {
-        state.jump = null;
-        setTimeout(function () { const t = document.getElementById('bp-ledger'); if (t) t.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60);
-      }
-    }
-    /* On phones there is no sidebar: a small switch moves between the two pages. */
-    const dashSwitch = [['overview', 'Overview'], ['plan', 'Budget & Transactions']].map(function (t) {
-      const b = h('button', { type: 'button', class: 'dash-switch-btn', onclick: function () { pickTab(t[0]); } }, t[1]);
-      b.dataset.tab = t[0];
-      return b;
+    home = OVERVIEW.render({
+      h: h, icon: icon, ask: ask, toast: toast, book: book, mode: 'home',
+      onCleanup: function (fn) { const prev = state.cleanup; state.cleanup = function () { fn(); if (prev) prev(); }; },
+      openTab: function (name) { if (name === 'plan') openPlan(); else openSheet(name === 'budget' ? 'add' : 'entries'); },
+      openAdd: function () { if (state.editingId) resetForm(); openSheet('add'); },
+      openEntries: function () { openSheet('entries'); },
+      openPlan: book.canEdit ? openPlan : null,
+      editTx: function (tx) { startEditing(tx); openSheet('add'); },
+      removeTx: function (tx) { removeEntry(tx); },
+      editCategory: function (name, type) { planner.editCategory(name, type); }
     });
-    tracker.onTab = function (name) { if (state.dashTab !== name) pickTab(name); };
+    state.openAdd = book.mine && book.canEdit ? function () { if (state.editingId) resetForm(); openSheet('add'); } : null;
+    { const prev = state.cleanup; state.cleanup = function () { state.openAdd = null; if (prev) prev(); }; }
 
     budgetPanel.id = 'panel-budget';
-    budgetPanel.setAttribute('role', 'tabpanel');
-    budgetPanel.setAttribute('aria-labelledby', 'tab-budget');
     budgetPanel.append(
       h('div', { class: 'budget-head sheet-only-entries' }, h('h2', null, 'Income & spending'),
-        h('p', { class: 'small muted' }, 'Add an entry and see how this month stands against your split. Change the split on the Budget & Transactions page.')),
+        h('p', { class: 'small muted' }, 'Every entry for the month. Edit or delete any of them here.')),
       h('section', { class: 'sheet-only-entries', 'aria-label': 'Monthly summary' },
         h('div', { class: 'month-nav' },
           monthHeading,
@@ -6093,22 +6019,23 @@
             h('button', { type: 'button', class: 'link', onclick: exportCsv }, 'Export CSV'),
             filter)),
         listBox));
-    /* #dashboard opens on the Overview; #transactions opens the full ledger. */
-    pickTab(_ === 'budget-plan' ? 'plan' : 'overview');
+    /* Old links (#transactions, the add button on other pages) open their sheet over the Dashboard. */
+    if (state.pendingSheet) {
+      const which = state.pendingSheet;
+      state.pendingSheet = null;
+      setTimeout(function () { if (which === 'add' && book.canEdit) openSheet('add'); else openSheet('entries'); }, 0);
+    }
 
-    /* Your own dashboard shows only the Overview. Someone else's still says whose budget it is. */
-    return h('div', { class: 'wide' },
+    return h('div', { class: 'wide dash-wide' },
       book.mine ? null : h('section', { class: 'identity' },
         idAvatar(user, book),
         h('div', null,
           h('h1', null, user.name),
           user.bio ? h('p', { class: 'small muted' }, user.bio) : null),
         sharedBadge(book)),
-      h('nav', { class: 'dash-switch', 'aria-label': 'Dashboard pages' }, dashSwitch),
-      overviewPanel,
-      planPanel,
-      trackerPanel,
-      sheet);
+      home.el,
+      sheet,
+      book.canEdit ? planSheet : null);
   }
 
 

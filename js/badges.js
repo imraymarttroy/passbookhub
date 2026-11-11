@@ -73,7 +73,7 @@ window.BADGES = (function () {
     b('milestone-500', 'habit', '🌟', 'Milestone 500', 'Reach 500 logged entries.', function (c) { return count(c.txs.length, 500); }),
     b('millennium', 'habit', '💎', 'Millennium Saver', 'Reach 1,000 logged entries. Certified power user!', function (c) { return count(c.txs.length, 1000); }),
     b('clean-slate', 'habit', '🧹', 'Clean Slate', 'Have at least 10 expenses and give every one a category.', function (c) { return { ok: c.expenses.length >= 10 && c.expenses.every(function (t) { return t.category; }) }; }),
-    b('data-visualizer', 'habit', '📊', 'Data Visualizer', 'Open Budget & Transactions (your charts) 5 times in one week.', function (c) { return { ok: inWindow(c.ev.views && c.ev.views['budget-plan'], 7 * 864e5, 5) }; }),
+    b('data-visualizer', 'habit', '📊', 'Data Visualizer', 'Open your Dashboard (your charts) 5 times in one week.', function (c) { return { ok: inWindow(c.ev.views && c.ev.views['dashboard'], 7 * 864e5, 5) }; }),
     b('data-exporter', 'habit', '📤', 'Data Exporter', 'Download your entries as a CSV file.', function (c) { return { ok: (c.ev.csv || 0) >= 1 }; }),
     b('goal-setter', 'habit', '🎯', 'Goal Setter', 'Give a savings goal a target date.', function (c) { return { ok: c.goals.some(function (g) { return g.due; }) }; }, ['goals']),
     b('profile-customizer', 'habit', '🛠️', 'Profile Customizer', 'Add a profile picture and your name.', function (c) { return { ok: !!(c.user.avatar && c.user.name) }; }),

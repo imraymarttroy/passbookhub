@@ -1,4 +1,4 @@
-/* Dashboard "Overview" tab: money health at a glance.
+/* Dashboard: money health at a glance (mode 'home'); older Overview and Budget sections stay available as modes.
    Income vs expenses trend (with alerts), recent expenses, debts (utang) and savings goals.
    Uses window.BT (entries, money maths) and window.SOC (accounts, debts, goals). No Firebase code here. */
 window.OVERVIEW = (function () {
@@ -117,7 +117,10 @@ window.OVERVIEW = (function () {
     const goalsBox = h('section', { class: 'mo-card', 'aria-labelledby': 'bp-goals-h' });
     let limAll = false;
     el.className = 'ov mo';
-    if (planner) {
+    const home = ctx.mode === 'home';
+    if (home) {
+      el.classList.add('dh');
+    } else if (planner) {
       el.classList.add('bp-more');
       el.append(h('div', { class: 'mo-row bp-chart-row' }, catBox, cashBox), limBox, lowBox, goalsBox);
     } else {
@@ -1494,6 +1497,7 @@ window.OVERVIEW = (function () {
       readSplit();
       const c = compute();
       lastC = c;
+      if (home) { drawHome(); return; }
       drawStreak();
       const monthEl = el.querySelector('#mo-month');
       if (monthEl) monthEl.textContent = BT.monthLabel(c.month);
@@ -1640,6 +1644,320 @@ window.OVERVIEW = (function () {
           : h('div', { class: 'bp-goal' }, body));
       })));
     }
+
+    /* ---------- Dashboard (home): big numbers on top, where it goes in the middle, activity and accounts below ---------- */
+    const PERIODS = [['month', 'Month'], ['c1', '1st cutoff'], ['c2', '2nd cutoff']];
+    let period = 'month';
+    try { const p = localStorage.getItem('pbh.dashPeriod'); if (p === 'c1' || p === 'c2' || p === 'month') period = p; } catch (e) { /* storage off */ }
+    let homeLimAll = false;
+    const homeHead = h('div', { class: 'dh-head' });
+    const homeHero = h('div', { class: 'dh-hero' });
+    const homeMid = h('div', { class: 'dh-row dh-mid' });
+    const homeLow = h('div', { class: 'dh-row dh-low' });
+    if (home) el.append(homeHead, homeHero, homeMid, homeLow);
+
+    const compactFmt = (function () {
+      try { return new Intl.NumberFormat(I18N.locale, { style: 'currency', currency: book.currency, notation: 'compact', maximumFractionDigits: 1 }); }
+      catch (e) { return null; }
+    })();
+    function compactMoney(cents) {
+      if (hiddenAmounts()) return '••••';
+      return compactFmt ? compactFmt.format(cents / 100) : money(cents);
+    }
+    function signed(cents) {
+      if (hiddenAmounts()) return '••••••';
+      return (cents < 0 ? '−' : cents > 0 ? '+' : '') + money(Math.abs(cents));
+    }
+    function periodRange(month) {
+      const dim = daysInMonth(month);
+      if (period === 'c1') return { from: 1, to: 15 };
+      if (period === 'c2') return { from: 16, to: dim };
+      return { from: 1, to: dim };
+    }
+    function periodText(month, r) {
+      const y = +month.slice(0, 4), m = +month.slice(5, 7) - 1;
+      const fmt = function (d) { return new Date(y, m, d).toLocaleDateString(I18N.locale, { month: 'short', day: 'numeric' }); };
+      return fmt(r.from) + ' – ' + fmt(r.to) + ', ' + y;
+    }
+    function periodNoun() { return period === 'month' ? 'this month' : 'this cutoff'; }
+    /** Green below 80% of the limit, amber from 80%, red when over. */
+    function levelOf(used, limit) {
+      if (!(limit > 0)) return 'none';
+      const r = used / limit;
+      return r > 1 ? 'bad' : r >= 0.8 ? 'warn' : 'ok';
+    }
+    function dhBar(used, limit, level) {
+      const pct = limit > 0 ? Math.max(0, Math.min(100, used / limit * 100)) : 0;
+      return h('div', { class: 'dh-bar', 'data-level': level || levelOf(used, limit), role: 'presentation' }, h('i', { style: 'width:' + pct.toFixed(1) + '%' }));
+    }
+    function dhCard(title, id, body, action, cls) {
+      return h('section', { class: 'mo-card dh-card' + (cls ? ' ' + cls : ''), 'aria-labelledby': id },
+        h('div', { class: 'dh-card-head' }, h('h3', { id: id, class: 'mo-label' }, title), action || null), body);
+    }
+    function homeStats() {
+      const today = BT.today();
+      const month = BT.monthOf(today);
+      const r = periodRange(month);
+      const txs = book.list().filter(function (t) {
+        if (BT.monthOf(t.date) !== month) return false;
+        const d = +t.date.slice(8, 10);
+        return d >= r.from && d <= r.to;
+      });
+      const sum = { income: 0, needs: 0, wants: 0, savings: 0 };
+      let incomeCount = 0;
+      txs.forEach(function (t) { if (sum[t.type] !== undefined) sum[t.type] += t.cents; if (t.type === 'income') incomeCount++; });
+      const s = shares();
+      const spent = sum.needs + sum.wants;
+      const budget = Math.round(sum.income * (s.needs + s.wants) / 100);
+      return {
+        today: today, month: month, range: r, txs: txs, sum: sum, incomeCount: incomeCount, shares: s,
+        spent: spent, budget: budget, safe: budget - spent, net: sum.income - spent
+      };
+    }
+
+    function drawHomeHead(st) {
+      const first = String((book.owner && book.owner.name) || '').trim().split(/\s+/)[0];
+      const seg = h('div', { class: 'dh-seg', role: 'group', 'aria-label': 'Period' }, PERIODS.map(function (p) {
+        return h('button', {
+          type: 'button', class: 'dh-seg-btn', 'aria-pressed': period === p[0] ? 'true' : 'false',
+          onclick: function () {
+            period = p[0];
+            try { localStorage.setItem('pbh.dashPeriod', period); } catch (e) { /* storage off */ }
+            draw();
+          }
+        }, p[1]);
+      }));
+      const hidden = hiddenAmounts();
+      const eye = h('button', {
+        type: 'button', class: 'dh-eye', 'aria-pressed': hidden ? 'true' : 'false',
+        'aria-label': hidden ? 'Show amounts' : 'Hide amounts', title: hidden ? 'Show amounts' : 'Hide amounts',
+        onclick: function () {
+          try { localStorage.setItem('pbh.hideAmounts', hiddenAmounts() ? '0' : '1'); } catch (e) { /* storage off */ }
+          draw();
+        }
+      }, icon(hidden ? 'eyeClosed' : 'eye'));
+      homeHead.replaceChildren(
+        h('div', { class: 'dh-title' },
+          h('h2', null, 'Dashboard'),
+          h('p', { class: 'mo-sub' }, (book.mine && first ? 'Welcome back, ' + first + ' · ' : '') + 'Pay period: ' + periodText(st.month, st.range))),
+        h('div', { class: 'dh-tools' }, seg, eye));
+    }
+
+    function drawHomeHero(st) {
+      const inc = st.sum.income;
+      function stat(label, value, foot, cls, extra) {
+        return h('section', { class: 'mo-card dh-stat' + (cls ? ' ' + cls : '') },
+          h('p', { class: 'mo-label' }, label),
+          h('p', { class: 'dh-stat-value num' }, value),
+          extra || null,
+          h('p', { class: 'dh-stat-foot' }, foot));
+      }
+      const safeLevel = inc > 0 ? levelOf(st.spent, st.budget) : 'none';
+      homeHero.replaceChildren(
+        stat('Total income', show(inc),
+          inc > 0 ? st.incomeCount + (st.incomeCount === 1 ? ' entry ' : ' entries ') + periodNoun() : 'No income logged ' + periodNoun()),
+        stat('Total spent', show(st.spent),
+          inc > 0 ? Math.round(st.spent / inc * 100) + '% of income' : 'Needs + wants'),
+        stat('Safe-to-spend', inc > 0 ? (st.safe < 0 && !hiddenAmounts() ? '−' : '') + show(Math.abs(st.safe)) : '—',
+          inc > 0 ? (st.safe < 0 ? 'Over your spending budget' : 'Left of ' + show(st.budget) + ' budget') : 'Add income to see this',
+          st.safe < 0 && inc > 0 ? 'is-bad' : null,
+          dhBar(inc > 0 ? st.spent : 0, inc > 0 ? st.budget : 0, safeLevel)),
+        stat('Net cash flow', inc > 0 || st.spent > 0 ? signed(st.net) : show(0),
+          show(st.sum.savings) + ' to savings',
+          st.net < 0 ? 'is-bad' : null));
+    }
+
+    function drawHomeMid(st) {
+      const inc = st.sum.income;
+      const rows = [
+        ['needs', 'Needs', st.shares.needs, 1],
+        ['wants', 'Wants', st.shares.wants, 0.55],
+        ['savings', 'Savings & debt', st.shares.savings, 0.25]
+      ];
+      /* Donut: how the money was split, each part as a share of income (or of everything logged). */
+      const allocated = st.sum.needs + st.sum.wants + st.sum.savings;
+      const base = Math.max(inc, allocated);
+      const r = 46, C = 2 * Math.PI * r;
+      const ring = svg('svg', { viewBox: '0 0 120 120', class: 'dh-donut', role: 'img', 'aria-label': 'Needs, wants and savings ' + periodNoun() });
+      ring.appendChild(svg('circle', { cx: 60, cy: 60, r: r, class: 'mo-donut-track' }));
+      const g = svg('g', { transform: 'rotate(-90 60 60)' });
+      let off = 0;
+      const parts = rows.filter(function (x) { return st.sum[x[0]] > 0; });
+      parts.forEach(function (x) {
+        const len = base > 0 ? st.sum[x[0]] / base * C : 0;
+        g.appendChild(svg('circle', { cx: 60, cy: 60, r: r, class: 'mo-donut-seg', 'stroke-opacity': x[3],
+          'stroke-dasharray': Math.max(0, len - (parts.length > 1 ? 2 : 0)).toFixed(2) + ' ' + C.toFixed(2), 'stroke-dashoffset': (-off).toFixed(2) }));
+        off += len;
+      });
+      ring.appendChild(g);
+      const mid = svg('text', { x: 60, y: 60, 'text-anchor': 'middle', class: 'dh-donut-total' });
+      mid.textContent = inc > 0 ? Math.round(allocated / inc * 100) + '%' : compactMoney(allocated);
+      const sub = svg('text', { x: 60, y: 76, 'text-anchor': 'middle', class: 'mo-tick' });
+      sub.textContent = inc > 0 ? 'of income' : 'logged';
+      ring.append(mid, sub);
+      const list = h('ul', { class: 'dh-split' }, rows.map(function (x) {
+        const target = Math.round(inc * x[2] / 100), used = st.sum[x[0]];
+        /* Savings are good to go past; only needs and wants turn amber or red. */
+        const level = target > 0 ? (x[0] === 'savings' ? 'ok' : levelOf(used, target)) : 'none';
+        return h('li', null,
+          h('div', { class: 'dh-line' },
+            h('span', { class: 'dh-line-name' }, moDot(x[3]), x[1], h('span', { class: 'mo-faint' }, ' ' + x[2] + '%')),
+            h('span', { class: 'num dh-line-amt' }, show(used), h('span', { class: 'mo-faint' }, ' / ' + (target > 0 ? show(target) : '—')))),
+          dhBar(used, target, level));
+      }));
+      const splitTitle = st.shares.needs + '/' + st.shares.wants + '/' + st.shares.savings + ' split';
+      const split = dhCard(splitTitle, 'dh-split-h',
+        h('div', { class: 'dh-body' },
+          h('div', { class: 'dh-split-wrap' }, ring, list),
+          h('div', { class: 'dh-foot' }, h('span', { class: 'mo-faint small' }, inc > 0
+            ? (inc - allocated >= 0 ? show(inc - allocated) + ' of income not yet assigned' : show(allocated - inc) + ' more than your income')
+            : 'Add your income ' + periodNoun() + ' to see your targets.'))),
+        ctx.openPlan && book.canEdit ? h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openPlan(); } }, 'Edit split') : null);
+
+      /* Category limits: this period's spending per category against its limit. */
+      const half = period !== 'month';
+      const groups = {};
+      st.txs.forEach(function (t) {
+        if (t.type !== 'needs' && t.type !== 'wants') return;
+        const raw = (t.category || '').trim();
+        const key = raw ? raw.toLowerCase() : '__' + t.type;
+        const gr = groups[key] || (groups[key] = { name: raw || ('Other ' + BT.TYPE_LABELS[t.type].toLowerCase()), label: raw, type: t.type, spent: 0, limit: 0 });
+        gr.spent += t.cents;
+      });
+      planOf().cats.forEach(function (p) {
+        if (!(p.cents > 0) || (p.type !== 'needs' && p.type !== 'wants')) return;
+        const key = p.name.toLowerCase();
+        const gr = groups[key] || (groups[key] = { name: p.name, label: p.name, type: p.type, spent: 0, limit: 0 });
+        gr.limit = half ? Math.round(p.cents / 2) : p.cents;
+      });
+      const cats = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) {
+        const ra = a.limit ? a.spent / a.limit : -1, rb = b.limit ? b.spent / b.limit : -1;
+        return rb - ra || b.spent - a.spent;
+      });
+      const shown = homeLimAll ? cats : cats.slice(0, 5);
+      const limitBody = cats.length
+        ? h('div', { class: 'dh-body' },
+          h('ul', { class: 'dh-cats' }, shown.map(function (c) {
+            const level = levelOf(c.spent, c.limit);
+            const editable = book.canEdit && book.mine && c.label && ctx.editCategory;
+            const status = c.limit > 0 ? (level === 'bad' ? show(c.spent - c.limit) + ' over' : show(c.limit - c.spent) + ' left') : 'No limit';
+            return h('li', { class: 'dh-cat', 'data-level': level, title: status },
+              CAT_ICONS.tile(iconFor(c.label, c.type), 'sm'),
+              h('div', { class: 'dh-cat-main' },
+                h('div', { class: 'dh-line' },
+                  editable
+                    ? h('button', { type: 'button', class: 'dh-cat-name', title: c.limit > 0 ? 'Edit limit' : 'Set limit', onclick: function () { ctx.editCategory(c.label, c.type); } }, c.name)
+                    : h('span', { class: 'dh-cat-name' }, c.name),
+                  h('span', { class: 'num dh-line-amt' }, h('span', { class: 'dh-cat-used' }, show(c.spent)), h('span', { class: 'mo-faint' }, ' / ' + (c.limit > 0 ? show(c.limit) : 'no limit')))),
+                dhBar(c.spent, c.limit, level),
+                h('span', { class: 'vh' }, status)));
+          })),
+          h('div', { class: 'dh-foot' },
+            h('span', { class: 'mo-faint small' }, half ? 'Cutoff view: half of each monthly limit' : cats.length > 5 ? shown.length + ' of ' + cats.length : ''),
+            cats.length > 5 ? h('button', { type: 'button', class: 'mo-link', onclick: function () { homeLimAll = !homeLimAll; draw(); } }, homeLimAll ? 'Show less' : 'Show all') : null))
+        : moEmpty('No spending ' + periodNoun() + ' yet. Your categories and their limits show here.');
+      const limits = dhCard('Category limits', 'dh-lim-h', limitBody,
+        ctx.openPlan && book.canEdit ? h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openPlan(); } }, 'Set limits') : null);
+      homeMid.replaceChildren(split, limits);
+    }
+
+    function drawHomeLow(st) {
+      const today = st.today;
+      const txs = st.txs.slice().sort(function (a, b) {
+        return a.date === b.date ? (b.createdAt || 0) - (a.createdAt || 0) : (a.date < b.date ? 1 : -1);
+      }).slice(0, 8);
+      const canEdit = book.canEdit && ctx.editTx;
+      const addBtn = book.canEdit && ctx.openAdd ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { ctx.openAdd(); } }, '+ Add') : null;
+      const recent = dhCard('Recent transactions', 'dh-recent-h',
+        txs.length
+          ? h('div', null,
+            h('ul', { class: 'dh-tx' }, txs.map(function (t) {
+              const plus = t.type === 'income';
+              const label = (t.desc || BT.TYPE_LABELS[t.type]) + ', ' + money(t.cents);
+              return h('li', null,
+                CAT_ICONS.tile(iconFor(t.category, t.type), 'sm'),
+                h('span', { class: 'mo-list-main' },
+                  h('span', { class: 'mo-list-title' }, t.desc || BT.TYPE_LABELS[t.type]),
+                  h('span', { class: 'mo-faint' }, [dayLabel(t.date, today), t.category || BT.TYPE_LABELS[t.type], t.method].filter(Boolean).join(' · '))),
+                h('span', { class: 'num dh-tx-amt' + (plus ? ' is-in' : '') }, hiddenAmounts() ? show(t.cents) : (plus ? '+' : '−') + money(t.cents)),
+                canEdit ? h('span', { class: 'dh-tx-tools' },
+                  h('button', { type: 'button', class: 'dh-icon', 'aria-label': 'Edit ' + label, title: 'Edit', onclick: function () { ctx.editTx(t); } }, icon('edit')),
+                  h('button', { type: 'button', class: 'dh-icon', 'aria-label': 'Delete ' + label, title: 'Delete', onclick: function () { ctx.removeTx(t); } }, icon('remove'))) : null);
+            })),
+            ctx.openEntries ? h('div', { class: 'dh-foot' }, h('span'), h('button', { type: 'button', class: 'mo-link', onclick: function () { ctx.openEntries(); } }, 'See all')) : null)
+          : h('div', { class: 'dh-empty' },
+            h('p', null, 'No transactions ' + periodNoun() + ' yet.'),
+            book.canEdit ? h('p', { class: 'mo-faint' }, 'Record your first expense to get started.') : null,
+            book.canEdit && ctx.openAdd ? h('button', { type: 'button', class: 'mo-btn', onclick: function () { ctx.openAdd(); } }, '+ Add expense') : null),
+        txs.length ? addBtn : null, 'dh-recent');
+
+      /* Wallets: your saved accounts; without any, money in and out per payment method this period. */
+      const accounts = data.accounts || [];
+      let walletBody;
+      if (data.accounts === null) walletBody = moEmpty('Loading…');
+      else if (accounts.length) {
+        const owed = function (a) { return a.type === 'credit' || a.type === 'loan'; };
+        const total = accounts.reduce(function (t, a) { return t + (owed(a) ? -a.cents : a.cents); }, 0);
+        walletBody = h('div', null,
+          h('ul', { class: 'dh-wallets' }, accounts.map(function (a) {
+            return h('li', null,
+              CAT_ICONS.tile(owed(a) ? 'card' : a.type === 'savings' ? 'piggy' : 'wallet', 'sm'),
+              h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, a.name), h('span', { class: 'mo-faint' }, SOC.ACCOUNT_TYPES[a.type] || '')),
+              h('span', { class: 'num' }, owed(a) && !hiddenAmounts() ? '−' + money(a.cents) : show(a.cents)));
+          })),
+          h('div', { class: 'dh-total' }, h('span', null, 'Total'), h('span', { class: 'num' }, hiddenAmounts() ? show(0) : signed(total).replace(/^\+/, ''))));
+      } else {
+        const by = {};
+        st.txs.forEach(function (t) {
+          if (!t.method) return;
+          const m = by[t.method] || (by[t.method] = { name: t.method, net: 0 });
+          m.net += t.type === 'income' ? t.cents : -t.cents;
+        });
+        const methods = Object.keys(by).map(function (k) { return by[k]; }).sort(function (a, b) { return Math.abs(b.net) - Math.abs(a.net); });
+        const methodIcon = { Cash: 'cash', GCash: 'phone', Maya: 'phone', 'Bank transfer': 'bank', 'Debit card': 'card', 'Credit card': 'card' };
+        walletBody = methods.length
+          ? h('div', null,
+            h('ul', { class: 'dh-wallets' }, methods.map(function (m) {
+              return h('li', null,
+                CAT_ICONS.tile(methodIcon[m.name] || 'wallet', 'sm'),
+                h('span', { class: 'mo-list-main' }, h('span', { class: 'mo-list-title' }, m.name), h('span', { class: 'mo-faint' }, 'Net ' + periodNoun())),
+                h('span', { class: 'num' + (m.net < 0 ? ' is-out' : '') }, signed(m.net)));
+            })))
+          : moEmpty('Pick a payment method (Cash, GCash, Maya, bank) when you add entries to see your wallets here.');
+      }
+      const wallets = dhCard('Wallets & accounts', 'dh-wallet-h', walletBody);
+
+      /* Active goals: up to three, emergency fund first. */
+      let goalBody;
+      if (data.goals === null) goalBody = moEmpty('Loading…');
+      else if (data.goalError) goalBody = moEmpty(data.goalError);
+      else if (!data.goals.length) goalBody = moEmpty(book.canEdit ? 'No goals yet. Start with an emergency fund.' : 'No goals yet.');
+      else {
+        const goals = data.goals.slice().sort(function (a, b) { return (a.kind === 'emergency' ? 0 : 1) - (b.kind === 'emergency' ? 0 : 1); }).slice(0, 3);
+        goalBody = h('ul', { class: 'dh-goals' }, goals.map(function (g) {
+          const pct = g.targetCents > 0 ? Math.min(100, Math.round(g.savedCents / g.targetCents * 100)) : 0;
+          const inner = [
+            h('div', { class: 'dh-line' }, h('span', { class: 'dh-line-name' }, g.name), h('span', { class: 'num mo-faint' }, pct + '%')),
+            dhBar(g.savedCents, g.targetCents, 'ok'),
+            h('p', { class: 'dh-cat-foot num' }, show(g.savedCents) + ' of ' + show(g.targetCents))];
+          return h('li', null, book.canEdit
+            ? h('button', { type: 'button', class: 'dh-goal', 'aria-label': 'Edit goal ' + g.name, onclick: function () { goalForm(g); } }, inner)
+            : h('div', { class: 'dh-goal' }, inner));
+        }));
+      }
+      const goalsCard = dhCard('Active goals', 'dh-goal-h', goalBody,
+        book.canEdit ? h('button', { type: 'button', class: 'mo-link', onclick: function () { goalForm(null); } }, '+ New goal') : null);
+      homeLow.replaceChildren(recent, h('div', { class: 'dh-stack' }, wallets, goalsCard));
+    }
+
+    function drawHome() {
+      const st = homeStats();
+      drawHomeHead(st);
+      drawHomeHero(st);
+      drawHomeMid(st);
+      drawHomeLow(st);
+    }
+
     draw();
     return { el: el, refresh: draw };
   }
