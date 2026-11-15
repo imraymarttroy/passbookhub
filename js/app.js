@@ -272,8 +272,9 @@
     if (wanted === 'community' || /^community\/[A-Za-z0-9]{6,40}$/.test(wanted)) return 'community';
     if (wanted === 'notifications') return 'alerts';
     if (wanted === 'dashboard') return 'dashboard';
-    /* Overview and Budget & Transactions became one Dashboard page: old links land there. */
-    if (wanted === 'transactions') { state.pendingSheet = 'entries'; return 'dashboard'; }
+    /* Dashboard sub-pages: Wallet / Accounts and History (every transaction, with search). */
+    if (wanted === 'wallet' || wanted === 'accounts') return 'wallet';
+    if (wanted === 'history' || wanted === 'transactions') return 'history';
     if (wanted === 'budget-plan' || wanted === 'overview') return 'dashboard';
     if (wanted === 'games' || wanted === 'stash-streak') return 'stash-streak';
     /* After signing in (or with no page in the address), start on the profile. */
@@ -281,7 +282,9 @@
   }
 
   /* Views that show the sidebar. Only the signed-in owner of the account ever sees it. */
-  const SHELL_VIEWS = ['dashboard', 'budget-plan', 'shared', 'community', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
+  const SHELL_VIEWS = ['dashboard', 'wallet', 'history', 'budget-plan', 'shared', 'community', 'messages', 'stash-streak', 'profile', 'person', 'circle', 'alerts', 'settings'];
+
+  const DASH_VIEWS = ['dashboard', 'wallet', 'history', 'budget-plan'];
 
   const VIEWS = {
     signin: { title: 'Sign in', render: viewAuth },
@@ -291,6 +294,8 @@
     setup: { title: 'Set up your profile', render: viewSetup },
     secure: { title: 'Secure your account', render: viewSecure },
     dashboard: { title: 'Dashboard', render: viewDashboard },
+    wallet: { title: 'Wallet / Accounts', render: viewDashboard },
+    history: { title: 'History', render: viewDashboard },
     'budget-plan': { title: 'Budget & Transactions', render: viewDashboard },
     messages: { title: 'Messages', render: viewMessages },
     community: { title: 'Community', render: viewCommunity },
@@ -309,6 +314,8 @@
   function render() {
     const view = resolveView();
     if (!BT.currentUser() && window.WHATS_NEW) WHATS_NEW.resetSession();
+    if (!BT.currentUser() && window.PRO) PRO.resetSession();
+    if (SHELL_VIEWS.indexOf(view) === -1 && window.PRO) PRO.closeAll();
     /* The features pop-up belongs to the signed-in app only: never over sign in, sign up or setup. */
     if (SHELL_VIEWS.indexOf(view) === -1 && window.WHATS_NEW && WHATS_NEW.close) WHATS_NEW.close();
     if (SHELL_VIEWS.indexOf(view) === -1) calculator.close();
@@ -338,6 +345,8 @@
       root.replaceChildren(content);
     }
     dock.sync(SHELL_VIEWS.indexOf(view) !== -1);
+    /* Welcome pop-up: once after every sign-in, over the signed-in app only. */
+    if (SHELL_VIEWS.indexOf(view) !== -1 && BT.currentUser() && window.PRO) PRO.welcomeOnLogin(BT.currentUser().id);
     if (SHELL_VIEWS.indexOf(view) !== -1) setTimeout(checkBadges, 0);
     if (changed) {
       window.scrollTo(0, 0);
@@ -2106,13 +2115,35 @@
   }
 
   /* Dashboard: one page (big numbers, split and limits, recent activity, wallets and goals). */
+  /* Dashboard: a channel with its own sub-pages, like Games. */
+  const DASH_CHANNEL = [['wallet', 'Wallet / Accounts'], ['history', 'History']];
   function dashboardChannel(current) {
-    const here = current === 'dashboard';
+    const here = current === 'dashboard' || DASH_CHANNEL.some(function (c) { return c[0] === current; });
+    let open = here;
+    try { if (!open) open = localStorage.getItem('pbh.dashOpen') !== '0'; } catch (e) { open = true; }
+    const sub = h('ul', { class: 'nav-sub', id: 'nav-sub-dash', hidden: !open },
+      DASH_CHANNEL.map(function (c) {
+        return h('li', null, h('a', { class: 'nav-sub-item', href: '#' + c[0], 'aria-current': current === c[0] ? 'page' : null },
+          h('span', { class: 'nav-hash', 'aria-hidden': 'true' }, '#'), h('span', { class: 'nav-label' }, c[1])));
+      }));
+    const chev = h('button', {
+      type: 'button', class: 'nav-chev' + (open ? ' open' : ''), 'aria-controls': 'nav-sub-dash',
+      'aria-expanded': open ? 'true' : 'false', 'aria-label': open ? 'Hide dashboard pages' : 'Show dashboard pages',
+      onclick: function () { setOpen(sub.hidden); }
+    }, icon('down'));
+    function setOpen(on) {
+      sub.hidden = !on;
+      chev.classList.toggle('open', on);
+      chev.setAttribute('aria-expanded', on ? 'true' : 'false');
+      chev.setAttribute('aria-label', on ? 'Hide dashboard pages' : 'Show dashboard pages');
+      try { localStorage.setItem('pbh.dashOpen', on ? '1' : '0'); } catch (e) { /* storage off */ }
+    }
     const link = h('a', {
-      class: 'nav-item', href: '#dashboard', title: 'Dashboard', 'aria-current': here ? 'page' : null
+      class: 'nav-item', href: '#dashboard', title: 'Dashboard', 'aria-current': current === 'dashboard' ? 'page' : null,
+      onclick: function () { setOpen(true); }
     }, navIcon('dashboard'), h('span', { class: 'nav-label' }, 'Dashboard'),
       h('span', { class: 'nav-pin', title: 'Private: only you can see your dashboard' }, icon('pin'), h('span', { class: 'vh' }, '(private)')));
-    return h('li', null, link);
+    return h('li', { class: 'nav-channel' }, h('div', { class: 'nav-channel-row' }, link, chev), sub);
   }
 
   /* Games: a channel like Dashboard, one sub-tab per game. Stash & Streak is the badges game. */
@@ -2248,7 +2279,7 @@
     return h('button', {
       type: 'button', class: 'fab', title: 'Add expense or income', 'aria-label': 'Add expense or income',
       onclick: function () {
-        if (state.view === 'dashboard' && state.openAdd) { state.openAdd(); return; }
+        if (DASH_VIEWS.indexOf(state.view) !== -1 && state.openAdd) { state.openAdd(); return; }
         state.pendingSheet = 'add';
         if (location.hash === '#dashboard') render(); else location.hash = '#dashboard';
       }
@@ -2272,8 +2303,14 @@
       onclick: function () { dock.toggleAi(); }
     });
     aiBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">' + AI_SPARK + '</svg><span class="top-label">Ask PassbookHub AI</span>';
+    const proBtn = h('button', {
+      type: 'button', class: 'top-btn pro-top-btn' + (window.PRO && user && PRO.trialActive(user.id) ? ' is-pro' : ''), title: 'PassbookHub Pro', 'aria-label': 'PassbookHub Pro',
+      onclick: function () { if (window.PRO) PRO.showPro(user && user.id); }
+    });
+    proBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M3 7.5 6.5 10 10 4l3.5 6L17 7.5 15.5 15h-11z"/></svg><span class="top-label">Pro</span>';
     const top = h('div', { class: 'top-actions' },
       versionButton(),
+      proBtn,
       aiBtn,
       themeButton(),
       topLink('notifications', '#alerts', 'Alerts'),
@@ -5391,8 +5428,11 @@
     return book;
   }
 
-  function viewDashboard(_, given) {
+  function viewDashboard(view, given) {
     const book = withActivity(given && given.list ? given : myBook());
+    /* Your own Dashboard has sub-pages; a dashboard shared with you shows only its home. */
+    const page = given ? 'dashboard' : (view === 'wallet' || view === 'history' ? view : 'dashboard');
+    let ledger = null;
     const user = book.owner;
     const money = function (cents) { return BT.formatMoney(cents, book.currency); };
     const monthHeading = h('h2', { 'aria-live': 'polite' });
@@ -5692,6 +5732,7 @@
       drawSummary(book.month(state.month));
       drawList();
       if (home) home.refresh();
+      if (ledger) ledger.draw();
     }
 
     /* ---- Transactions: the full ledger, in the same minimalist cards as the Overview ---- */
@@ -5995,7 +6036,9 @@
       openPlan: book.canEdit ? openPlan : null,
       editTx: function (tx) { startEditing(tx); openSheet('add'); },
       removeTx: function (tx) { removeEntry(tx); },
-      editCategory: function (name, type) { planner.editCategory(name, type); }
+      editCategory: function (name, type) { planner.editCategory(name, type); },
+      goWallet: book.mine ? function (adding) { state.pendingAccount = !!adding; location.hash = '#wallet'; } : null,
+      goHistory: book.mine ? function (adding) { if (adding) state.pendingSheet = 'add'; location.hash = '#history'; } : null
     });
     state.openAdd = book.mine && book.canEdit ? function () { if (state.editingId) resetForm(); openSheet('add'); } : null;
     { const prev = state.cleanup; state.cleanup = function () { state.openAdd = null; if (prev) prev(); }; }
@@ -6026,6 +6069,37 @@
       setTimeout(function () { if (which === 'add' && book.canEdit) openSheet('add'); else openSheet('entries'); }, 0);
     }
 
+    /* Small tabs on top: the same Dashboard pages as the sidebar, handy on phones where the sidebar is a bottom bar. */
+    const tabs = book.mine ? h('nav', { class: 'dash-tabs', 'aria-label': 'Dashboard pages' },
+      [['dashboard', 'Overview'], ['wallet', 'Wallet / Accounts'], ['history', 'History']].map(function (t) {
+        return h('a', { class: 'dash-tab', href: '#' + t[0], 'aria-current': page === t[0] ? 'page' : null }, t[1]);
+      })) : null;
+
+    let body = home.el;
+    if (page === 'wallet') {
+      const tracker = savingsTracker(book);
+      const kinds = [['tracker', 'All']].concat(Object.keys(SOC.ACCOUNT_TYPES).map(function (k) { return [k, SOC.ACCOUNT_TYPES[k]]; }));
+      const chips = h('div', { class: 'dash-chips', role: 'group', 'aria-label': 'Account type' }, kinds.map(function (k, i) {
+        return h('button', { type: 'button', class: 'dash-chip', 'aria-pressed': i === 0 ? 'true' : 'false', 'data-tab': k[0], onclick: function () { tracker.setTab(k[0]); } }, k[1]);
+      }));
+      tracker.onTab = function (t) { chips.querySelectorAll('.dash-chip').forEach(function (c) { c.setAttribute('aria-pressed', c.dataset.tab === t ? 'true' : 'false'); }); };
+      body = h('div', { class: 'dash-page' },
+        h('div', { class: 'hm-head' }, h('h2', { class: 'hm-hello' }, 'Wallet / Accounts'),
+          h('p', { class: 'hm-date' }, 'Your cash, bank, e-wallet, credit and loan balances.')),
+        chips, tracker.el);
+      if (state.pendingAccount && book.canEdit) {
+        state.pendingAccount = false;
+        setTimeout(function () { if (tracker.openAdd) tracker.openAdd(); }, 0);
+      }
+    } else if (page === 'history') {
+      ledger = transactionsLedger();
+      ledger.draw();
+      body = h('div', { class: 'dash-page' },
+        h('div', { class: 'hm-head' }, h('h2', { class: 'hm-hello' }, 'History'),
+          h('p', { class: 'hm-date' }, 'Search, filter and edit every transaction.')),
+        ledger.el);
+    }
+
     return h('div', { class: 'wide dash-wide' },
       book.mine ? null : h('section', { class: 'identity' },
         idAvatar(user, book),
@@ -6033,7 +6107,9 @@
           h('h1', null, user.name),
           user.bio ? h('p', { class: 'small muted' }, user.bio) : null),
         sharedBadge(book)),
-      home.el,
+      h('h1', { class: 'vh' }, page === 'wallet' ? 'Wallet / Accounts' : page === 'history' ? 'History' : 'Dashboard'),
+      tabs,
+      body,
       sheet,
       book.canEdit ? planSheet : null);
   }
@@ -6549,7 +6625,7 @@
     }
 
     function setTab(next) { tab = next; draw(); if (api.onTab) api.onTab(next); }
-    const api = { el: el, setTab: setTab, onTab: null };
+    const api = { el: el, setTab: setTab, onTab: null, openAdd: function () { openAccountForm(null, null); } };
     return api;
   }
 
@@ -6858,12 +6934,12 @@
     publishGameStats(BADGES.evaluate(badgeInput({}, store)));
   }
   BT.onTxChange(function () {
-    if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
+    if (DASH_VIEWS.indexOf(state.view) !== -1 && state.refreshDashboard) state.refreshDashboard();
     checkBadges();
   });
   document.addEventListener('pbh-chime', function () { trackBadge('chime'); });
   BT.onPlanChange(function () {
-    if ((state.view === 'dashboard' || state.view === 'budget-plan') && state.refreshDashboard) state.refreshDashboard();
+    if (DASH_VIEWS.indexOf(state.view) !== -1 && state.refreshDashboard) state.refreshDashboard();
     checkBadges();
   });
   /* ---------- New-alert pop-up, bottom right ---------- */

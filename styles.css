@@ -4449,3 +4449,101 @@ body:has(.chat-pop:not([hidden])) .fab { display: none; }
   .dh-split-wrap { grid-template-columns: 7rem minmax(0, 1fr); gap: 1.25rem; }
   .dh-donut { width: 7rem; height: 7rem; }
 }
+
+/* ======================================================================
+   Dashboard home: greeting + five simple cards (v2.7)
+   ====================================================================== */
+.hm-head { margin: 0 0 0.25rem; }
+.hm-hello { margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; }
+.hm-date { margin: 0.25rem 0 0; font-size: 0.875rem; color: var(--ink-2); }
+.hm-grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); }
+.hm-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 0.875rem; min-width: 0; min-height: 13rem;
+  padding: 1.25rem; border: 1px solid var(--line); border-radius: 16px; background: transparent;
+}
+.hm-text { display: flex; flex-direction: column; gap: 0.25rem; width: 100%; min-width: 0; flex: 1; }
+.hm-kicker { margin: 0; font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.hm-title { margin: 0; font-size: 1.0625rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.hm-body { margin: 0; font-size: 0.8125rem; line-height: 1.45; color: var(--ink-2); }
+.hm-list { list-style: none; margin: 0.25rem 0 0; padding: 0; font-size: 0.8125rem; }
+.hm-list li { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.3125rem 0; border-bottom: 1px solid var(--line); color: var(--ink-2); }
+.hm-list li:last-child { border-bottom: 0; }
+.hm-list li span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-list .num { color: var(--ink); }
+.hm-bar { height: 0.375rem; margin: 0.375rem 0 0.5rem; border-radius: 999px; background: var(--wash); overflow: hidden; }
+.hm-bar i { display: block; height: 100%; border-radius: inherit; background: var(--meter); }
+.hm-bar.over i { background: var(--critical); }
+.hm-btn {
+  margin-top: auto; padding: 0.4375rem 0.9375rem; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: transparent; color: var(--ink); font: inherit; font-size: 0.8125rem; font-weight: 500; cursor: pointer;
+}
+.hm-btn:hover { border-color: var(--ink); }
+.hm-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Dashboard pages: tabs on top (Overview, Wallet / Accounts, History) */
+.dash-tabs { display: flex; gap: 0.25rem; margin: 0 0 1.25rem; padding: 0.25rem; width: max-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 999px; }
+.dash-tab { flex: none; padding: 0.375rem 0.875rem; border-radius: 999px; font-size: 0.8125rem; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.dash-tab:hover { color: var(--ink); }
+.dash-tab[aria-current="page"] { background: var(--wash); color: var(--ink); font-weight: 600; }
+.dash-page { display: flex; flex-direction: column; gap: 1rem; }
+.dash-chips { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.dash-chip { padding: 0.3125rem 0.75rem; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink-2); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.dash-chip:hover { color: var(--ink); border-color: var(--line-strong); }
+.dash-chip[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 500; }
+@media (max-width: 760px) {
+  .hm-grid { grid-template-columns: minmax(0, 1fr); }
+  .hm-card { min-height: 0; }
+  .hm-hello { font-size: 1.375rem; }
+}
+
+/* ======================================================================
+   Welcome and PassbookHub Pro pop-ups
+   ====================================================================== */
+.pw-overlay { position: fixed; inset: 0; z-index: 210; display: grid; place-items: center; padding: 1rem; background: rgba(0, 0, 0, 0.5); animation: wu-fade 0.16s ease-out; }
+.pw-overlay.pw-out { opacity: 0; transition: opacity 0.16s; }
+.pw-card {
+  width: min(26rem, 100%); max-height: calc(100dvh - 2rem); overflow: auto; padding: 1.75rem 1.5rem 1.5rem;
+  border: 1px solid var(--line); border-radius: 16px; background: var(--page); color: var(--ink);
+}
+.pw-head { display: flex; flex-direction: column; align-items: flex-start; gap: 0.375rem; }
+.pw-title { margin: 0; font-size: 1.25rem; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+.pw-sub { margin: 0; font-size: 0.875rem; line-height: 1.5; color: var(--ink-2); }
+.pw-rule { margin: 1.25rem 0; border: 0; border-top: 1px solid var(--line); }
+.pw-kicker { margin: 0 0 0.5rem; font-size: 0.6875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); }
+.pw-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.875rem; }
+.pw-list li { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.75rem; align-items: start; }
+.pw-ico { display: grid; place-items: center; width: 2rem; height: 2rem; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); }
+.pw-ico svg { width: 1rem; height: 1rem; }
+.pw-item { margin: 0; font-size: 0.875rem; font-weight: 500; line-height: 1.35; }
+.pw-desc { margin: 0.125rem 0 0; font-size: 0.8125rem; line-height: 1.45; color: var(--ink-2); }
+.pw-foot { margin-top: 1.5rem; }
+.pw-foot-col { display: flex; flex-direction: column; align-items: stretch; gap: 0.5rem; }
+.pw-primary {
+  width: 100%; padding: 0.6875rem 1rem; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer;
+}
+.pw-primary:hover:not(:disabled) { opacity: 0.9; }
+.pw-primary:disabled { opacity: 0.6; cursor: default; }
+.pw-primary:focus-visible, .pw-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pw-ghost { padding: 0.5rem 1rem; border: 0; border-radius: 999px; background: none; color: var(--ink-2); font: inherit; font-size: 0.8125rem; cursor: pointer; }
+.pw-ghost:hover { color: var(--ink); }
+.pw-note { margin: 0; text-align: center; font-size: 0.75rem; color: var(--ink-2); }
+.pw-status { margin: 0; text-align: center; font-size: 0.8125rem; color: var(--ink); }
+.pw-status:empty { display: none; }
+.pw-badge { display: inline-flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem; padding: 0.125rem 0.5rem 0.125rem 0.25rem; border: 1px solid var(--line); border-radius: 999px; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+.pw-badge .pw-ico { width: 1.25rem; height: 1.25rem; border: 0; }
+.pw-badge .pw-ico svg { width: 0.875rem; height: 0.875rem; }
+
+/* Pro button in the top bar, just before Ask PassbookHub AI */
+.top-btn.pro-top-btn svg { width: 1.25rem; height: 1.25rem; }
+.top-btn.pro-top-btn.is-pro { color: var(--accent); }
+@media (min-width: 761px) {
+  .top-btn.pro-top-btn, .top-btn.pro-top-btn:hover {
+    width: auto; height: 2.25rem; padding: 0 0.875rem 0 0.625rem; gap: 0.375rem;
+    display: inline-flex; align-items: center;
+    border: 1px solid var(--line-strong); border-radius: 999px !important; color: var(--ink);
+  }
+  .top-btn.pro-top-btn:hover { border-color: var(--ink-2); }
+  .pro-top-btn .top-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 0.8125rem; font-weight: 600; }
+  .pro-top-btn svg { width: 1.125rem; height: 1.125rem; }
+}
