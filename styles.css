@@ -4547,3 +4547,7 @@ body:has(.chat-pop:not([hidden])) .fab { display: none; }
   .pro-top-btn .top-label { position: static; width: auto; height: auto; overflow: visible; clip: auto; font-size: 0.8125rem; font-weight: 600; }
   .pro-top-btn svg { width: 1.125rem; height: 1.125rem; }
 }
+
+/* History page: the page title already says History */
+.dash-page .tl > .mo-head h2 { display: none; }
+.dash-page .tl > .mo-head .mo-sub { margin: 0; }
