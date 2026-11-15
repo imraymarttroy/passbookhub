@@ -15,15 +15,14 @@ window.WHATS_NEW = (function () {
    * Bump it with every release and update CHANGES below. A new version shows the tour once more,
    * even for people who ticked "Don't show this again".
    */
-  const APP_VERSION = '2.7.0';
+  const APP_VERSION = '2.8.0';
   /* The full tour on login only comes back when this changes; small updates use the minimal popup instead. */
   const FEATURES_VERSION = '2.0.0';
 
   /* What changed in APP_VERSION, shown in the minimal update popup (version button in the sidebar). */
   const UPDATE = {
     en: { title: 'What\u2019s new', close: 'Close', ok: 'Got it', items: [
-      ['New Dashboard', 'A friendly greeting and five simple cards: accounts, expense categories, budget, goals, and debts & loans.'],
-      ['Wallet / Accounts and History', 'Two new Dashboard pages: your balances in one place, and every transaction with search and filters.'],
+      ['Tracker', 'The Dashboard is now the Tracker. We\u2019re rebuilding it from scratch, so it\u2019s empty for now.'],
       ['PassbookHub Pro', 'AI & automation, unlimited planning, more customization and no ads. Try it free for 7 days.'],
       ['Money format', 'Every amount now shows commas and 2 decimals, like \u20b110,000.00, including the amount boxes as you type.'],
       ['Quicker adding', '+ Add expense / income and + Add entry now open a short form, not the whole list.'],
@@ -37,8 +36,7 @@ window.WHATS_NEW = (function () {
       ['Coming soon', 'Community and Blog are in the sidebar, locked for now.']
     ] },
     fil: { title: 'Ano ang bago', close: 'Isara', ok: 'Sige', items: [
-      ['Bagong Dashboard', 'May bati at limang simpleng card: accounts, expense categories, budget, goals, at utang at pautang.'],
-      ['Wallet / Accounts at History', 'Dalawang bagong page sa Dashboard: lahat ng balance mo, at bawat transaction na may search at filter.'],
+      ['Tracker', 'Tracker na ang dating Dashboard. Binubuo namin ito ulit mula sa simula, kaya wala pa itong laman.'],
       ['PassbookHub Pro', 'AI at automation, walang limit na planning, mas maraming customization at walang ads. Libre sa unang 7 araw.'],
       ['Format ng pera', 'May comma at 2 decimal na ang lahat ng halaga, gaya ng \u20b110,000.00, pati habang nagta-type.'],
       ['Mas mabilis mag-add', 'Maikling form na lang ang lalabas sa + Add expense / income at + Add entry.'],

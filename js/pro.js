@@ -61,12 +61,11 @@ window.PRO = (function () {
   /* ---------- Welcome ---------- */
 
   const FEATURES = [
-    ['dash', 'Dashboard', 'Accounts, spending, budget, goals and debts at a glance.'],
-    ['wallet', 'Wallet / Accounts', 'Cash, bank and e-wallet balances in one place.'],
-    ['history', 'History', 'Search and filter every transaction you log.'],
-    ['goal', 'Budgets & goals', 'Category limits, a 50/30/20 split and savings goals.'],
+    ['dash', 'Tracker', 'Your new home for tracking money. More is on the way.'],
     ['ai', 'Ask PassbookHub AI', 'Clear answers to your money questions, any time.'],
-    ['people', 'Community & games', 'Share wins with your circle and earn badges.']
+    ['people', 'Community & Messages', 'Share wins and chat with your circle.'],
+    ['goal', 'Stash & Streak', 'Earn badges for building good money habits.'],
+    ['crown', 'PassbookHub Pro', 'Try every Pro feature free for 7 days.']
   ];
 
   function showWelcome(onDone) {
