@@ -5361,14 +5361,25 @@
         : 'No wallet or savings accounts yet.';
     }
 
+    /* Good morning (5:00–11:59), afternoon (12:00–17:59) or evening, with the person's first name. */
+    const firstName = String(user.name || '').trim().split(/\s+/)[0] || '';
+    const greeting = h('h1', { class: 'tracker-greeting' });
+    function greet() {
+      const hour = new Date().getHours();
+      const part = hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : 'evening';
+      greeting.textContent = 'Good ' + part + (firstName ? ', ' + firstName : '');
+    }
+    greet();
+    const tick = setInterval(greet, 60 * 1000);
+
     const stop = SOC.watchAccounts(null,
       function (list) { accounts = list; failed = false; draw(); },
       function () { failed = true; draw(); });
-    state.cleanup = function () { if (typeof stop === 'function') stop(); };
+    state.cleanup = function () { if (typeof stop === 'function') stop(); clearInterval(tick); };
     draw();
 
     return h('div', { class: 'wide tracker-page' },
-      h('h1', null, 'Tracker'),
+      greeting,
       h('section', { class: 'cash-card', 'aria-labelledby': 'cash-title' },
         h('div', { class: 'cash-head' }, h('h2', { id: 'cash-title' }, 'Total liquid cash'), eye),
         amount,
