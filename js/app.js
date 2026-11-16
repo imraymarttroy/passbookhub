@@ -5369,8 +5369,18 @@
       const part = hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : 'evening';
       greeting.textContent = 'Good ' + part + (firstName ? ', ' + firstName : '');
     }
+    /* Today's day and date on the left, the time on the right. */
+    const dateEl = h('span', { class: 'tracker-date' });
+    const timeEl = h('time', { class: 'tracker-time' });
+    function clock() {
+      const now = new Date();
+      dateEl.textContent = now.toLocaleDateString(I18N.locale, { weekday: 'long', month: 'long', day: 'numeric' });
+      timeEl.textContent = now.toLocaleTimeString(I18N.locale, { hour: 'numeric', minute: '2-digit' });
+      timeEl.setAttribute('datetime', now.toISOString());
+    }
     greet();
-    const tick = setInterval(greet, 60 * 1000);
+    clock();
+    const tick = setInterval(function () { greet(); clock(); }, 1000);
 
     const stop = SOC.watchAccounts(null,
       function (list) { accounts = list; failed = false; draw(); },
@@ -5379,6 +5389,7 @@
     draw();
 
     return h('div', { class: 'wide tracker-page' },
+      h('div', { class: 'tracker-today' }, dateEl, timeEl),
       greeting,
       h('section', { class: 'cash-card', 'aria-labelledby': 'cash-title' },
         h('div', { class: 'cash-head' }, h('h2', { id: 'cash-title' }, 'Total liquid cash'), eye),
