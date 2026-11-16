@@ -5397,7 +5397,7 @@
         h('button', { type: 'button', class: 'cash-eye', 'aria-label': 'Close', title: 'Close', onclick: function () { close(); } }, icon('close'))),
       h('div', { class: 'stack' }, bank.el, bankList, name.el, type.el, cents.el, last4.el, formError),
       h('div', { class: 'ask-actions wl-actions' }, del, h('span', { class: 'wl-grow' }), cancel, save));
-    const overlay = h('div', { class: 'chat-overlay ask' }, form);
+    const overlay = h('div', { class: 'chat-overlay ask wl-overlay' }, form);
     function onKey(e) { if (e.key === 'Escape' && !document.querySelector('.ask-card[role="alertdialog"]')) close(); }
     function close() {
       document.removeEventListener('keydown', onKey, true);
