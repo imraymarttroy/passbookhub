@@ -88,7 +88,7 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['bank', 'name', 'type', 'cents', 'last4', 'createdAt', 'updatedAt'])
           && request.resource.data.bank is string && request.resource.data.bank.size() > 0 && request.resource.data.bank.size() <= 40
           && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
-          && request.resource.data.type in ['wallet', 'savings', 'credit', 'loan']
+          && request.resource.data.type in ['cash', 'wallet', 'savings', 'checking', 'credit', 'loan', 'investment']
           && request.resource.data.cents is int && request.resource.data.cents >= 0 && request.resource.data.cents <= 100000000000000
           && request.resource.data.last4 is string && request.resource.data.last4.matches('^([0-9]{4})?$')
           && request.resource.data.createdAt is int && request.resource.data.updatedAt is int;

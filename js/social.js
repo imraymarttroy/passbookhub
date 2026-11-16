@@ -145,7 +145,7 @@ window.SOC = (function () {
   /** Wallet + savings, the same "Total savings" the tracker shows. */
   async function savingsTotal(owner) {
     const snap = await run(function () { return F().getDocs(accountsCol(owner || me())); });
-    return snap.docs.reduce(function (t, d) { const a = d.data(); return a.type === 'wallet' || a.type === 'savings' ? t + a.cents : t; }, 0);
+    return snap.docs.reduce(function (t, d) { const a = d.data(); return LIQUID_TYPES.indexOf(a.type) !== -1 ? t + a.cents : t; }, 0);
   }
 
   /* ---------- Notes: a short line above your picture, for your circle, gone after 24 hours ---------- */
@@ -971,7 +971,11 @@ window.SOC = (function () {
      users/{owner}/accounts/{id} = { bank, name, type, cents, last4, createdAt, updatedAt }.
      cents is the balance; for credit and loan it is the amount owed. */
 
-  const ACCOUNT_TYPES = { wallet: 'Wallet', savings: 'Savings', credit: 'Credit', loan: 'Loan' };
+  /* Order is the order of the Type dropdown. E-Wallet keeps the stored key 'wallet' so older accounts stay valid. */
+  const ACCOUNT_TYPES = { cash: 'Cash', wallet: 'E-Wallet', savings: 'Savings', checking: 'Checking', credit: 'Credit Card', loan: 'Loan', investment: 'Investment' };
+  /* Money you can spend right away. Credit and loan are owed; investments aren't cash. */
+  const LIQUID_TYPES = ['cash', 'wallet', 'savings', 'checking'];
+  const OWED_TYPES = ['credit', 'loan'];
   const accountsCol = function (owner) { return F().collection(db(), 'users', owner, 'accounts'); };
 
   function validateAccount(a) {
@@ -1221,7 +1225,7 @@ window.SOC = (function () {
     myTrust: myTrust, trustedMe: trustedMe, trustLoaded: trustLoaded, trustFrom: trustFrom,
     inviteTrusted: inviteTrusted, setTrustRole: setTrustRole, syncTrustCurrency: syncTrustCurrency, removeTrusted: removeTrusted,
     acceptTrust: acceptTrust, leaveTrust: leaveTrust,
-    ACCOUNT_TYPES: ACCOUNT_TYPES, validateAccount: validateAccount, watchAccounts: watchAccounts,
+    ACCOUNT_TYPES: ACCOUNT_TYPES, LIQUID_TYPES: LIQUID_TYPES, OWED_TYPES: OWED_TYPES, validateAccount: validateAccount, watchAccounts: watchAccounts,
     addAccount: addAccount, updateAccount: updateAccount, deleteAccount: deleteAccount,
     DEBT_DIRS: DEBT_DIRS, GOAL_KINDS: GOAL_KINDS, validateDebt: validateDebt, validateGoal: validateGoal,
     watchDebts: watchDebts, saveDebt: saveDebt, notifyDebt: notifyDebt, deleteDebt: deleteDebt, watchGoals: watchGoals, saveGoal: saveGoal, deleteGoal: deleteGoal, saveGameStats: saveGameStats, deleteGameStats: deleteGameStats, gameLeaderboard: gameLeaderboard,
