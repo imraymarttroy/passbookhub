@@ -3578,3 +3578,24 @@ h1.cm-title { font-size: 1.375rem; }
 .tracker-today { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.125rem; font-size: 0.75rem; color: var(--ink-2); }
 .tracker-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tracker-page .tracker-greeting { margin-top: 0; }
+/* Tracker: Wallets box */
+.wl-list { margin: 0.5rem 0 0; padding: 0; list-style: none; }
+.wl-list li + li { border-top: 1px solid var(--line); }
+.wl-row { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.75rem 0.25rem; border: 0; border-radius: var(--r-sm); background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.wl-row:hover { background: var(--wash); }
+.wl-row:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wl-main { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.wl-main strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-bal { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wl-bal.owed { color: var(--critical-ink); }
+.wl-add { display: flex; width: 100%; align-items: center; justify-content: center; gap: 0.5rem; margin-top: 0.75rem; min-height: 2.75rem; border: 1px dashed var(--line-strong); border-radius: var(--r-sm); background: transparent; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.wl-add:hover { background: var(--wash); }
+.wl-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wl-add svg { width: 1.125rem; height: 1.125rem; }
+.wl-dialog { width: min(28rem, calc(100% - 2rem)); max-height: calc(100vh - 2rem); overflow-y: auto; }
+.sts-dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.sts-dialog-head h2 { margin: 0; }
+.sts-error { margin: 0; color: var(--critical-ink); font-size: 0.875rem; }
+.wl-actions { display: flex; gap: 0.5rem; }
+.wl-grow { flex: 1; }
+.wl-delete { color: var(--critical-ink); border-color: var(--critical); }
