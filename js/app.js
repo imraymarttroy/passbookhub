@@ -5332,13 +5332,13 @@
   function cashSetHidden(uid, hidden) { try { localStorage.setItem(cashHideKey(uid), hidden ? '1' : '0'); } catch (e) { /* storage off */ } }
 
   /* Banks and e-wallets to pick from; any name up to 40 characters also works. */
-  const WALLET_PROVIDERS = ['Cash', 'GCash', 'Maya', 'GoTyme', 'SeaBank', 'MariBank', 'Tonik', 'CIMB', 'ShopeePay', 'BPI', 'BDO', 'Metrobank', 'Landbank', 'UnionBank', 'Security Bank', 'PNB', 'RCBC', 'China Bank', 'EastWest', 'Other'];
+  const WALLET_PROVIDERS = ['Cash', 'GCash', 'Maya', 'GoTyme', 'SeaBank', 'MariBank', 'Tonik', 'CIMB', 'ShopeePay', 'BPI', 'BDO', 'Metrobank', 'Landbank', 'UnionBank', 'Security Bank', 'PNB', 'RCBC', 'China Bank', 'EastWest', 'SPayLater', 'Home Credit', 'Pag-IBIG (MP2)', 'COL Financial', 'Coins.ph', 'Other'];
 
   /** Add (no account) or edit (an account) a wallet. Saves straight to the Savings tracker accounts. */
   function walletDialog(account) {
     const previous = document.activeElement;
     const editing = !!account;
-    const a = account || { bank: '', name: '', type: 'wallet', cents: 0, last4: '' };
+    const a = account || { bank: '', name: '', type: 'cash', cents: 0, last4: '' };
     function row(id, label, control, hint) {
       const err = h('p', { class: 'error', id: id + '-err', hidden: true });
       control.id = id;
@@ -5346,16 +5346,17 @@
       return { control: control, err: err, el: h('div', { class: 'field' }, h('label', { for: id }, label), control, hint ? h('p', { class: 'hint' }, hint) : null, err) };
     }
     const bankList = h('datalist', { id: 'wl-banks' }, WALLET_PROVIDERS.map(function (b) { return h('option', { value: b }); }));
-    const bank = row('wl-bank', 'Bank or e-wallet', h('input', { list: 'wl-banks', maxlength: '40', autocomplete: 'off', placeholder: 'e.g. GCash', value: a.bank }));
+    const bank = row('wl-bank', 'Provider', h('input', { list: 'wl-banks', maxlength: '40', autocomplete: 'off', placeholder: 'e.g. GCash', value: a.bank }));
     const name = row('wl-name', 'Name', h('input', { maxlength: '40', autocomplete: 'off', placeholder: 'e.g. Everyday wallet', value: a.name }));
-    const typeSel = h('select', null, Object.keys(SOC.ACCOUNT_TYPES).map(function (k) { return h('option', { value: k }, SOC.ACCOUNT_TYPES[k]); }));
-    typeSel.value = a.type;
-    const type = row('wl-type', 'Type', typeSel, 'Wallet and Savings count toward your total liquid cash.');
+    const TYPE_EXAMPLES = { cash: 'Physical money', wallet: 'GCash, Maya, etc.', savings: 'BDO, BPI, GoTyme, SeaBank, etc.', checking: 'Current account', credit: 'Amount you owe', loan: 'SPayLater, Home Credit, personal or bank loan', investment: 'MP2, stocks, crypto' };
+    const typeSel = h('select', null, Object.keys(SOC.ACCOUNT_TYPES).map(function (k) { return h('option', { value: k }, SOC.ACCOUNT_TYPES[k] + (TYPE_EXAMPLES[k] ? ' (' + TYPE_EXAMPLES[k] + ')' : '')); }));
+    typeSel.value = SOC.ACCOUNT_TYPES[a.type] ? a.type : 'cash';
+    const type = row('wl-type', 'Type', typeSel, 'Cash, E-Wallet, Savings and Checking count toward your total liquid cash.');
     const cents = row('wl-cents', 'Balance', BT.moneyInput(h('input', { value: BT.amountText(a.cents) })));
     const last4 = row('wl-last4', 'Last 4 digits (optional)', h('input', { inputmode: 'numeric', maxlength: '4', autocomplete: 'off', value: a.last4 || '' }));
     const fields = { bank: bank, name: name, type: type, cents: cents, last4: last4 };
     const formError = h('p', { class: 'sts-error', role: 'alert', hidden: true });
-    function syncBalanceLabel() { cents.el.querySelector('label').textContent = typeSel.value === 'credit' || typeSel.value === 'loan' ? 'Amount owed' : 'Balance'; }
+    function syncBalanceLabel() { cents.el.querySelector('label').textContent = SOC.OWED_TYPES.indexOf(typeSel.value) !== -1 ? 'Amount owed' : 'Balance'; }
     typeSel.addEventListener('change', syncBalanceLabel);
     syncBalanceLabel();
 
@@ -5432,14 +5433,14 @@
       eye.setAttribute('aria-pressed', hidden ? 'true' : 'false');
       if (failed) { amount.textContent = hidden ? MASK : '—'; sub.textContent = 'We couldn’t load your accounts right now.'; return; }
       if (accounts === null) { amount.textContent = hidden ? MASK : '…'; sub.textContent = 'Loading…'; return; }
-      const liquid = accounts.filter(function (a) { return (a.type === 'wallet' || a.type === 'savings') && Number.isInteger(a.cents); });
+      const liquid = accounts.filter(function (a) { return SOC.LIQUID_TYPES.indexOf(a.type) !== -1 && Number.isInteger(a.cents); });
       const total = liquid.reduce(function (t, a) { return t + a.cents; }, 0);
       amount.textContent = hidden ? MASK : BT.formatMoney(total, currency);
       sub.textContent = liquid.length
-        ? 'Wallet + savings · ' + liquid.length + (liquid.length === 1 ? ' account' : ' accounts')
-        : 'No wallet or savings accounts yet.';
+        ? 'Cash, e-wallets, savings and checking · ' + liquid.length + (liquid.length === 1 ? ' account' : ' accounts')
+        : 'No cash, e-wallet, savings or checking yet.';
       walletList.replaceChildren.apply(walletList, accounts.map(function (acc) {
-        const owed = acc.type === 'credit' || acc.type === 'loan';
+        const owed = SOC.OWED_TYPES.indexOf(acc.type) !== -1;
         return h('li', null, h('button', { type: 'button', class: 'wl-row', title: 'Edit ' + acc.name, onclick: function () { walletDialog(acc); } },
           h('span', { class: 'wl-main' }, h('strong', null, acc.name), h('span', { class: 'small muted' }, acc.bank + ' · ' + (SOC.ACCOUNT_TYPES[acc.type] || acc.type) + (acc.last4 ? ' · ••' + acc.last4 : ''))),
           h('span', { class: 'wl-bal' + (owed && !hidden ? ' owed' : '') }, hidden ? MASK : (owed ? '− ' : '') + BT.formatMoney(acc.cents || 0, currency))));
