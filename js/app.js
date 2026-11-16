@@ -5324,11 +5324,204 @@
     return COMM.render({ h: h, toast: toast, ask: ask, icon: icon, avatar: avatar, timeAgo: timeAgo, user: BT.currentUser() });
   }
 
-  /* ---------- Tracker (empty for now) ---------- */
+  /* ---------- Tracker: Safe to Spend ---------- */
+
+  /* Settings and the eye toggle are kept per person on this device. */
+  const STS_DEFAULTS = { source: 'auto', customCents: 0, reserveSavings: true, reserveNeeds: false, bufferCents: 0, countToday: true };
+  function stsKey(uid) { return 'pbh.sts.' + uid; }
+  function stsHideKey(uid) { return 'pbh.stsHide.' + uid; }
+  function stsLoad(uid) {
+    let raw = null;
+    try { raw = JSON.parse(localStorage.getItem(stsKey(uid)) || 'null'); } catch (e) { raw = null; }
+    const out = Object.assign({}, STS_DEFAULTS);
+    if (!raw || typeof raw !== 'object') return out;
+    if (['auto', 'logged', 'salary', 'custom'].indexOf(raw.source) !== -1) out.source = raw.source;
+    ['customCents', 'bufferCents'].forEach(function (k) { if (Number.isInteger(raw[k]) && raw[k] >= 0 && raw[k] <= 100000000000000) out[k] = raw[k]; });
+    ['reserveSavings', 'reserveNeeds', 'countToday'].forEach(function (k) { if (typeof raw[k] === 'boolean') out[k] = raw[k]; });
+    return out;
+  }
+  function stsSave(uid, settings) { try { localStorage.setItem(stsKey(uid), JSON.stringify(settings)); } catch (e) { /* storage off */ } }
+  function stsHidden(uid) { try { return localStorage.getItem(stsHideKey(uid)) === '1'; } catch (e) { return false; } }
+  function stsSetHidden(uid, hidden) { try { localStorage.setItem(stsHideKey(uid), hidden ? '1' : '0'); } catch (e) { /* storage off */ } }
+
+  /** Works in integer cents. Returns the amount, the days left, the daily allowance and every line of the breakdown. */
+  function safeToSpend(settings) {
+    const now = new Date();
+    const month = BT.monthOf(BT.today());
+    const totals = { income: 0, needs: 0, wants: 0, savings: 0 };
+    BT.monthTx(month).forEach(function (t) { if (totals[t.type] !== undefined && Number.isInteger(t.cents)) totals[t.type] += t.cents; });
+    const plan = BT.getPlan();
+    const shares = plan.shares || BT.DEFAULT_SHARES;
+
+    let income = 0, incomeLabel = 'Income logged this month';
+    if (settings.source === 'custom') { income = settings.customCents; incomeLabel = 'Your monthly amount'; }
+    else if (settings.source === 'salary') { income = plan.salaryCents || 0; incomeLabel = 'Monthly salary (budget plan)'; }
+    else if (settings.source === 'logged') { income = totals.income; }
+    else if (totals.income > 0) { income = totals.income; }
+    else { income = plan.salaryCents || 0; incomeLabel = 'Monthly salary (no income logged yet)'; }
+
+    const split = BT.splitAmount(income, shares);
+    const lines = [{ label: incomeLabel, cents: income, sign: 1 }];
+    lines.push({ label: 'Needs spent', cents: totals.needs, sign: -1 });
+    lines.push({ label: 'Wants spent', cents: totals.wants, sign: -1 });
+    if (settings.reserveSavings) {
+      const saved = Math.max(split.savings, totals.savings);
+      lines.push({ label: totals.savings >= split.savings ? 'Savings set aside' : 'Savings goal (' + shares.savings + '%)', cents: saved, sign: -1 });
+    } else {
+      lines.push({ label: 'Savings set aside', cents: totals.savings, sign: -1 });
+    }
+    if (settings.reserveNeeds) lines.push({ label: 'Needs still to pay (' + shares.needs + '% budget)', cents: Math.max(0, split.needs - totals.needs), sign: -1 });
+    if (settings.bufferCents > 0) lines.push({ label: 'Safety buffer', cents: settings.bufferCents, sign: -1 });
+
+    const safe = lines.reduce(function (sum, l) { return sum + l.sign * l.cents; }, 0);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysLeft = Math.max(1, lastDay - now.getDate() + (settings.countToday ? 1 : 0));
+    const daily = safe > 0 ? Math.floor(safe / daysLeft) : 0;
+    return { month: month, safe: safe, daysLeft: daysLeft, daily: daily, lines: lines, noIncome: income <= 0 };
+  }
+
+  function stsSettingsDialog(uid, currency, onSaved) {
+    const previous = document.activeElement;
+    const cur = stsLoad(uid);
+    const source = h('select', { id: 'sts-source', name: 'source' },
+      h('option', { value: 'auto' }, 'Automatic: income logged, or salary if none'),
+      h('option', { value: 'logged' }, 'Income logged this month'),
+      h('option', { value: 'salary' }, 'Monthly salary from my budget plan'),
+      h('option', { value: 'custom' }, 'A custom amount'));
+    source.value = cur.source;
+    const custom = BT.moneyInput(h('input', { id: 'sts-custom', name: 'custom', value: BT.amountText(cur.customCents) }));
+    const customField = h('div', { class: 'field' }, h('label', { for: 'sts-custom' }, 'Custom monthly amount (' + currency + ')'), custom);
+    const buffer = BT.moneyInput(h('input', { id: 'sts-buffer', name: 'buffer', value: BT.amountText(cur.bufferCents) }));
+    function check(id, label, hint, on) {
+      const box = h('input', { type: 'checkbox', id: id, checked: on });
+      return { box: box, row: h('label', { class: 'sts-check', for: id }, box, h('span', null, h('strong', null, label), h('span', { class: 'small muted' }, hint))) };
+    }
+    const savings = check('sts-savings', 'Keep my savings goal aside', 'Subtracts your savings share of income, even before you log it.', cur.reserveSavings);
+    const needs = check('sts-needs', 'Keep unpaid needs aside', 'Subtracts what’s left of your needs budget for bills still to come.', cur.reserveNeeds);
+    const today = check('sts-today', 'Count today as a day left', 'Turn off if today’s spending is already done.', cur.countToday);
+    const error = h('p', { class: 'sts-error', role: 'alert', hidden: true });
+    function syncCustom() { customField.hidden = source.value !== 'custom'; }
+    source.addEventListener('change', syncCustom);
+    syncCustom();
+
+    function toCents(input) {
+      if (!input.value.trim()) return 0;
+      const n = BT.parseAmount(input.value);
+      return isFinite(n) && n >= 0 ? Math.round(n * 100) : NaN;
+    }
+    const save = h('button', { type: 'submit', class: 'btn primary' }, 'Save');
+    const cancel = h('button', { type: 'button', class: 'btn', onclick: function () { close(); } }, 'Cancel');
+    const reset = h('button', { type: 'button', class: 'btn sts-reset', onclick: function () {
+      source.value = STS_DEFAULTS.source; custom.value = ''; buffer.value = '';
+      savings.box.checked = STS_DEFAULTS.reserveSavings; needs.box.checked = STS_DEFAULTS.reserveNeeds; today.box.checked = STS_DEFAULTS.countToday;
+      syncCustom();
+    } }, 'Reset');
+    const form = h('form', { class: 'ask-card sts-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sts-dialog-title', novalidate: true,
+      onsubmit: function (e) {
+        e.preventDefault();
+        const customCents = toCents(custom), bufferCents = toCents(buffer);
+        if (!isFinite(customCents) || !isFinite(bufferCents)) { error.textContent = 'Enter amounts as numbers, like 1,500.00.'; error.hidden = false; return; }
+        if (source.value === 'custom' && customCents <= 0) { error.textContent = 'Enter your custom monthly amount.'; error.hidden = false; custom.focus(); return; }
+        stsSave(uid, { source: source.value, customCents: customCents, bufferCents: bufferCents, reserveSavings: savings.box.checked, reserveNeeds: needs.box.checked, countToday: today.box.checked });
+        close();
+        onSaved();
+        toast('Safe to spend settings saved.');
+      } },
+      h('div', { class: 'sts-dialog-head' },
+        h('h2', { id: 'sts-dialog-title' }, 'Safe to spend settings'),
+        h('button', { type: 'button', class: 'sts-icon-btn', 'aria-label': 'Close', title: 'Close', onclick: function () { close(); } }, icon('close'))),
+      h('div', { class: 'stack' },
+        h('div', { class: 'field' }, h('label', { for: 'sts-source' }, 'Money for this month'), source),
+        customField,
+        h('div', { class: 'field' }, h('label', { for: 'sts-buffer' }, 'Safety buffer (' + currency + ')'), buffer,
+          h('p', { class: 'hint' }, 'An amount you never want to touch. Leave empty for none.')),
+        savings.row, needs.row, today.row, error),
+      h('div', { class: 'ask-actions sts-actions' }, reset, h('span', { class: 'sts-grow' }), cancel, save));
+    const overlay = h('div', { class: 'chat-overlay ask' }, form);
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    function close() {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (previous && previous.isConnected) previous.focus();
+    }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(overlay);
+    source.focus();
+  }
 
   function viewTracker() {
+    const user = BT.currentUser();
+    const uid = user.id;
+    const currency = user.currency || 'PHP';
+    let hidden = stsHidden(uid);
+    let open = false;
+    const MASK = '••••••';
+    function money(cents) { return hidden ? MASK : BT.formatMoney(cents, currency); }
+
+    const amount = h('p', { class: 'sts-amount', 'aria-live': 'polite' });
+    const monthEl = h('span', { class: 'sts-month' });
+    const daysEl = h('strong');
+    const dailyEl = h('strong');
+    const status = h('span', { class: 'sts-status' });
+    const note = h('p', { class: 'sts-note small muted', hidden: true });
+    const list = h('ul', { class: 'sts-lines', id: 'sts-breakdown', hidden: true });
+
+    const eye = h('button', { type: 'button', class: 'sts-icon-btn', onclick: function () {
+      hidden = !hidden; stsSetHidden(uid, hidden); draw();
+    } });
+    const gear = h('button', { type: 'button', class: 'sts-icon-btn', 'aria-label': 'Safe to spend settings', title: 'Safe to spend settings',
+      onclick: function () { stsSettingsDialog(uid, currency, draw); } }, navIcon('settings'));
+    const toggle = h('button', { type: 'button', class: 'sts-toggle', 'aria-expanded': 'false', 'aria-controls': 'sts-breakdown', onclick: function () {
+      open = !open; draw();
+    } });
+
+    function draw() {
+      const r = safeToSpend(stsLoad(uid));
+      monthEl.textContent = '(' + BT.monthLabel(r.month) + ')';
+      amount.textContent = money(r.safe);
+      amount.classList.toggle('neg', r.safe < 0 && !hidden);
+      daysEl.textContent = r.daysLeft + (r.daysLeft === 1 ? ' day' : ' days');
+      dailyEl.textContent = (hidden ? MASK : BT.formatMoney(r.daily, currency)) + '/day';
+      const ok = r.safe >= 0;
+      status.textContent = ok ? 'Safe' : 'Over budget';
+      status.className = 'sts-status ' + (ok ? 'ok' : 'bad');
+      status.replaceChildren(icon(ok ? 'check' : 'warning'), h('span', null, ok ? 'Safe' : 'Over budget'));
+      note.hidden = !r.noIncome;
+      note.textContent = r.noIncome ? 'No income yet for this month. Log your income or set an amount in settings.' : '';
+      eye.replaceChildren(icon(hidden ? 'eyeClosed' : 'eye'));
+      eye.setAttribute('aria-label', hidden ? 'Show amount' : 'Hide amount');
+      eye.setAttribute('title', hidden ? 'Show amount' : 'Hide amount');
+      eye.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.replaceChildren(h('span', null, open ? 'Hide breakdown' : 'View breakdown'), icon(open ? 'up' : 'down'));
+      list.hidden = !open;
+      list.replaceChildren.apply(list, r.lines.map(function (l) {
+        return h('li', null, h('span', null, l.label), h('span', { class: 'sts-val' }, hidden ? MASK : (l.sign < 0 ? '− ' : '') + BT.formatMoney(l.cents, currency)));
+      }).concat([h('li', { class: 'sts-total' }, h('span', null, 'Safe to spend'), h('span', { class: 'sts-val' }, money(r.safe)))]));
+    }
+
+    const card = h('section', { class: 'sts-card', 'aria-labelledby': 'sts-title' },
+      h('div', { class: 'sts-head' },
+        h('h2', { id: 'sts-title' }, 'Safe to Spend ', monthEl),
+        h('div', { class: 'sts-tools' }, eye, gear)),
+      amount,
+      h('div', { class: 'sts-stats' },
+        h('div', { class: 'sts-stat' }, h('span', { class: 'small muted' }, 'Days left'), daysEl),
+        h('div', { class: 'sts-stat' }, h('span', { class: 'small muted' }, 'Daily allowance'), dailyEl),
+        status),
+      note,
+      toggle,
+      list);
+
+    draw();
+    state.refreshTracker = draw;
+    /* Days left changes at midnight. */
+    const tick = setInterval(draw, 60 * 1000);
+    state.cleanup = function () { clearInterval(tick); state.refreshTracker = null; };
     return h('div', { class: 'wide tracker-page' },
-      h('h1', null, 'Tracker'));
+      h('h1', null, 'Tracker'),
+      card);
   }
 
   /* Screens that redraw when sharing (trusted person) changes. */
@@ -5372,10 +5565,12 @@
   }
   BT.onTxChange(function () {
     checkBadges();
+    if (state.refreshTracker) state.refreshTracker();
   });
   document.addEventListener('pbh-chime', function () { trackBadge('chime'); });
   BT.onPlanChange(function () {
     checkBadges();
+    if (state.refreshTracker) state.refreshTracker();
   });
   /* ---------- New-alert pop-up, bottom right ---------- */
   var seenNotes = null;
