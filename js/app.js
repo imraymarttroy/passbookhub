@@ -5331,6 +5331,84 @@
   function cashHidden(uid) { try { return localStorage.getItem(cashHideKey(uid)) === '1'; } catch (e) { return false; } }
   function cashSetHidden(uid, hidden) { try { localStorage.setItem(cashHideKey(uid), hidden ? '1' : '0'); } catch (e) { /* storage off */ } }
 
+  /* Banks and e-wallets to pick from; any name up to 40 characters also works. */
+  const WALLET_PROVIDERS = ['Cash', 'GCash', 'Maya', 'GoTyme', 'SeaBank', 'MariBank', 'Tonik', 'CIMB', 'ShopeePay', 'BPI', 'BDO', 'Metrobank', 'Landbank', 'UnionBank', 'Security Bank', 'PNB', 'RCBC', 'China Bank', 'EastWest', 'Other'];
+
+  /** Add (no account) or edit (an account) a wallet. Saves straight to the Savings tracker accounts. */
+  function walletDialog(account) {
+    const previous = document.activeElement;
+    const editing = !!account;
+    const a = account || { bank: '', name: '', type: 'wallet', cents: 0, last4: '' };
+    function row(id, label, control, hint) {
+      const err = h('p', { class: 'error', id: id + '-err', hidden: true });
+      control.id = id;
+      control.setAttribute('aria-describedby', id + '-err');
+      return { control: control, err: err, el: h('div', { class: 'field' }, h('label', { for: id }, label), control, hint ? h('p', { class: 'hint' }, hint) : null, err) };
+    }
+    const bankList = h('datalist', { id: 'wl-banks' }, WALLET_PROVIDERS.map(function (b) { return h('option', { value: b }); }));
+    const bank = row('wl-bank', 'Bank or e-wallet', h('input', { list: 'wl-banks', maxlength: '40', autocomplete: 'off', placeholder: 'e.g. GCash', value: a.bank }));
+    const name = row('wl-name', 'Name', h('input', { maxlength: '40', autocomplete: 'off', placeholder: 'e.g. Everyday wallet', value: a.name }));
+    const typeSel = h('select', null, Object.keys(SOC.ACCOUNT_TYPES).map(function (k) { return h('option', { value: k }, SOC.ACCOUNT_TYPES[k]); }));
+    typeSel.value = a.type;
+    const type = row('wl-type', 'Type', typeSel, 'Wallet and Savings count toward your total liquid cash.');
+    const cents = row('wl-cents', 'Balance', BT.moneyInput(h('input', { value: BT.amountText(a.cents) })));
+    const last4 = row('wl-last4', 'Last 4 digits (optional)', h('input', { inputmode: 'numeric', maxlength: '4', autocomplete: 'off', value: a.last4 || '' }));
+    const fields = { bank: bank, name: name, type: type, cents: cents, last4: last4 };
+    const formError = h('p', { class: 'sts-error', role: 'alert', hidden: true });
+    function syncBalanceLabel() { cents.el.querySelector('label').textContent = typeSel.value === 'credit' || typeSel.value === 'loan' ? 'Amount owed' : 'Balance'; }
+    typeSel.addEventListener('change', syncBalanceLabel);
+    syncBalanceLabel();
+
+    const save = h('button', { type: 'submit', class: 'btn primary' }, editing ? 'Save' : 'Add wallet');
+    const cancel = h('button', { type: 'button', class: 'btn', onclick: function () { close(); } }, 'Cancel');
+    const del = editing ? h('button', { type: 'button', class: 'btn wl-delete', onclick: async function () {
+      const yes = await ask({ title: 'Delete ' + a.name + '?', body: 'This removes it from your wallets. You can’t undo this.', yes: 'Delete' });
+      if (!yes) return;
+      try { await SOC.deleteAccount(null, account.id); close(); toast(a.name + ' deleted.'); }
+      catch (e) { formError.textContent = e.message; formError.hidden = false; }
+    } }, 'Delete') : null;
+
+    const form = h('form', { class: 'ask-card wl-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'wl-title', novalidate: true,
+      onsubmit: async function (e) {
+        e.preventDefault();
+        Object.keys(fields).forEach(function (k) { fields[k].err.hidden = true; fields[k].control.removeAttribute('aria-invalid'); });
+        formError.hidden = true;
+        const raw = cents.control.value.trim();
+        const n = raw ? BT.parseAmount(raw) : 0;
+        const next = { bank: bank.control.value.trim(), name: name.control.value, type: typeSel.value, cents: isFinite(n) ? Math.round(n * 100) : NaN, last4: last4.control.value.trim() };
+        const errors = SOC.validateAccount(next);
+        if (errors) {
+          Object.keys(errors).forEach(function (k) { if (fields[k]) { fields[k].err.textContent = errors[k]; fields[k].err.hidden = false; fields[k].control.setAttribute('aria-invalid', 'true'); } });
+          const first = Object.keys(errors).find(function (k) { return fields[k]; });
+          if (first) fields[first].control.focus();
+          return;
+        }
+        save.disabled = true;
+        try {
+          if (editing) await SOC.updateAccount(null, account.id, next);
+          else await SOC.addAccount(null, next);
+          close();
+          toast(editing ? next.name.trim() + ' saved.' : next.name.trim() + ' added.');
+        } catch (err) { formError.textContent = err.message; formError.hidden = false; save.disabled = false; }
+      } },
+      h('div', { class: 'sts-dialog-head' },
+        h('h2', { id: 'wl-title' }, editing ? 'Edit wallet' : 'Add wallet'),
+        h('button', { type: 'button', class: 'cash-eye', 'aria-label': 'Close', title: 'Close', onclick: function () { close(); } }, icon('close'))),
+      h('div', { class: 'stack' }, bank.el, bankList, name.el, type.el, cents.el, last4.el, formError),
+      h('div', { class: 'ask-actions wl-actions' }, del, h('span', { class: 'wl-grow' }), cancel, save));
+    const overlay = h('div', { class: 'chat-overlay ask' }, form);
+    function onKey(e) { if (e.key === 'Escape' && !document.querySelector('.ask-card[role="alertdialog"]')) close(); }
+    function close() {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      if (previous && previous.isConnected) previous.focus();
+    }
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', onKey, true);
+    document.body.appendChild(overlay);
+    bank.control.focus();
+  }
+
   function viewTracker() {
     const user = BT.currentUser();
     const uid = user.id;
@@ -5342,6 +5420,7 @@
 
     const amount = h('p', { class: 'cash-amount', 'aria-live': 'polite' });
     const sub = h('p', { class: 'cash-sub small muted' });
+    const walletList = h('ul', { class: 'wl-list', hidden: true });
     const eye = h('button', { type: 'button', class: 'cash-eye', onclick: function () {
       hidden = !hidden; cashSetHidden(uid, hidden); draw();
     } });
@@ -5359,6 +5438,13 @@
       sub.textContent = liquid.length
         ? 'Wallet + savings · ' + liquid.length + (liquid.length === 1 ? ' account' : ' accounts')
         : 'No wallet or savings accounts yet.';
+      walletList.replaceChildren.apply(walletList, accounts.map(function (acc) {
+        const owed = acc.type === 'credit' || acc.type === 'loan';
+        return h('li', null, h('button', { type: 'button', class: 'wl-row', title: 'Edit ' + acc.name, onclick: function () { walletDialog(acc); } },
+          h('span', { class: 'wl-main' }, h('strong', null, acc.name), h('span', { class: 'small muted' }, acc.bank + ' · ' + (SOC.ACCOUNT_TYPES[acc.type] || acc.type) + (acc.last4 ? ' · ••' + acc.last4 : ''))),
+          h('span', { class: 'wl-bal' + (owed && !hidden ? ' owed' : '') }, hidden ? MASK : (owed ? '− ' : '') + BT.formatMoney(acc.cents || 0, currency))));
+      }));
+      walletList.hidden = !accounts.length;
     }
 
     /* Good morning (5:00–11:59), afternoon (12:00–17:59) or evening, with the person's first name. */
@@ -5394,7 +5480,11 @@
       h('section', { class: 'cash-card', 'aria-labelledby': 'cash-title' },
         h('div', { class: 'cash-head' }, h('h2', { id: 'cash-title' }, 'Total liquid cash'), eye),
         amount,
-        sub));
+        sub),
+      h('section', { class: 'cash-card wl-card', 'aria-labelledby': 'wl-card-title' },
+        h('div', { class: 'cash-head' }, h('h2', { id: 'wl-card-title' }, 'Wallets')),
+        walletList,
+        h('button', { type: 'button', class: 'wl-add', onclick: function () { walletDialog(null); } }, icon('plus'), h('span', null, 'Add wallet'))));
   }
 
   /* Screens that redraw when sharing (trusted person) changes. */
